@@ -1,0 +1,36 @@
+{
+  "class_to_idx": {
+    "applauding_presentation": 0,
+    "at_team_celebration": 1,
+    "commuting_by_bike": 2,
+    "enjoying_team_meeting": 3,
+    "greeting_colleague": 4,
+    "having_coffee_break": 5,
+    "in_heated_discussion": 6,
+    "listening_with_headphones": 7,
+    "messaging_on_phone": 8,
+    "on_lunch_break": 9,
+    "on_phone_call": 10,
+    "rushing_to_meeting": 11,
+    "taking_a_nap": 12,
+    "working_at_desk": 13,
+    "working_on_laptop": 14
+  },
+  "idx_to_class": {
+    "0": "applauding_presentation",
+    "1": "at_team_celebration",
+    "2": "commuting_by_bike",
+    "3": "enjoying_team_meeting",
+    "4": "greeting_colleague",
+    "5": "having_coffee_break",
+    "6": "in_heated_discussion",
+    "7": "listening_with_headphones",
+    "8": "messaging_on_phone",
+    "9": "on_lunch_break",
+    "10": "on_phone_call",
+    "11": "rushing_to_meeting",
+    "12": "taking_a_nap",
+    "13": "working_at_desk",
+    "14": "working_on_laptop"
+  }
+}

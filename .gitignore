@@ -1,0 +1,146 @@
+# ============================================================
+# Python
+# ============================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Compiled extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ============================================================
+# Virtual Environments
+# ============================================================
+
+.venv/
+venv/
+env/
+ENV/
+
+# ============================================================
+# Environment Variables / Secrets
+# ============================================================
+
+.env
+.env.*
+!.env.example
+
+# ============================================================
+# Testing / Coverage
+# ============================================================
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ============================================================
+# Jupyter
+# ============================================================
+
+.ipynb_checkpoints/
+
+# ============================================================
+# IDEs / Editors
+# ============================================================
+
+.vscode/
+.idea/
+
+# Vim
+*.swp
+*.swo
+
+# ============================================================
+# macOS
+# ============================================================
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ============================================================
+# Logs
+# ============================================================
+
+*.log
+logs/
+
+# ============================================================
+# Project Generated Files
+# ============================================================
+
+# Uploaded videos
+app/uploads/*
+
+# Processed videos
+app/outputs/*
+
+# Keep the folders
+!app/uploads/.gitkeep
+!app/outputs/.gitkeep
+
+# ============================================================
+# Machine Learning
+# ============================================================
+
+# YOLO auto-downloaded weights
+yolov8n.pt
+yolov8s.pt
+yolov8m.pt
+yolov8l.pt
+yolov8x.pt
+
+# Ultralytics outputs
+runs/
+
+# TensorBoard
+tensorboard/
+events.out.tfevents*
+
+# Dataset folders
+datasets/
+data/raw/
+data/interim/
+
+# Cached model downloads
+.huggingface/
+.cache/
+
+# ============================================================
+# Temporary Files
+# ============================================================
+
+*.tmp
+*.temp
+
+# ============================================================
+# Keep trained model in Git
+# ============================================================
+
+# Your trained model should remain tracked:
+# app/models/efficientnet_b0_employee_activity.pth
+
+# Keep class mappings:
+# app/models/class_map.json

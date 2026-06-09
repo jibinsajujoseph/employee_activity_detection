@@ -1,0 +1,215 @@
+"""
+Two-stage inference pipeline:
+  Stage 1 — YOLOv8n person detection
+  Stage 2 — EfficientNet-B0 activity classification
+"""
+
+import json
+import os
+import time
+from pathlib import Path
+from typing import List, Dict, Tuple, Optional
+
+import cv2
+import numpy as np
+import torch
+import torch.nn as nn
+import timm
+from ultralytics import YOLO
+
+# ── paths ────────────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = BASE_DIR / "models"
+WEIGHTS_PATH = MODEL_DIR / "efficientnet_b0_employee_activity.pth"
+CLASS_MAP_PATH = MODEL_DIR / "class_map.json"
+
+# ── ImageNet normalisation constants ─────────────────────────────────────
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+
+# ── colour palette for bounding boxes (one per class) ────────────────────
+BOX_COLOURS: List[Tuple[int, int, int]] = [
+    (108, 99, 255),   # purple  — applauding_presentation
+    (34, 197, 94),    # green   — at_team_celebration
+    (59, 130, 246),   # blue    — commuting_by_bike
+    (249, 115, 22),   # orange  — enjoying_team_meeting
+    (236, 72, 153),   # pink    — greeting_colleague
+    (168, 85, 247),   # violet  — having_coffee_break
+    (239, 68, 68),    # red     — in_heated_discussion
+    (20, 184, 166),   # teal    — listening_with_headphones
+    (234, 179, 8),    # yellow  — messaging_on_phone
+    (132, 204, 22),   # lime    — on_lunch_break
+    (14, 165, 233),   # sky     — on_phone_call
+    (244, 63, 94),    # rose    — rushing_to_meeting
+    (99, 102, 241),   # indigo  — taking_a_nap
+    (34, 211, 238),   # cyan    — working_at_desk
+    (251, 146, 60),   # amber   — working_on_laptop
+]
+
+
+def _build_classifier_head(num_classes: int) -> nn.Sequential:
+    """Custom classification head matching the training architecture."""
+    return nn.Sequential(
+        nn.Dropout(0.3),
+        nn.Linear(1280, 512),
+        nn.SiLU(),
+        nn.Dropout(0.2),
+        nn.Linear(512, num_classes),
+    )
+
+
+class ActivityDetector:
+    """
+    End-to-end detector:
+      1. YOLOv8n  → person bounding boxes
+      2. EfficientNet-B0 → activity classification per crop
+    """
+
+    def __init__(self, device: Optional[str] = None):
+        # ── device selection ──────────────────────────────────────────
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
+        print(f"[ActivityDetector] Using device: {self.device}")
+
+        # ── load class map ────────────────────────────────────────────
+        with open(CLASS_MAP_PATH, "r") as f:
+            cmap = json.load(f)
+        self.idx_to_class: Dict[int, str] = {
+            int(k): v for k, v in cmap["idx_to_class"].items()
+        }
+        self.num_classes = len(self.idx_to_class)
+        print(f"[ActivityDetector] Loaded {self.num_classes} activity classes")
+
+        # ── Stage 1: YOLOv8n ─────────────────────────────────────────
+        self.yolo = YOLO("yolov8n.pt")
+        print("[ActivityDetector] YOLOv8n loaded")
+
+        # ── Stage 2: EfficientNet-B0 + custom head ───────────────────
+        backbone = timm.create_model(
+            "efficientnet_b0",
+            pretrained=False,
+            num_classes=0,
+            global_pool="avg",
+        )
+        self.classifier_head = _build_classifier_head(self.num_classes)
+        self.efficientnet = nn.Sequential(backbone, self.classifier_head)
+
+        if WEIGHTS_PATH.exists():
+            state = torch.load(str(WEIGHTS_PATH), map_location=self.device, weights_only=False)
+            self.efficientnet.load_state_dict(state, strict=False)
+            print("[ActivityDetector] EfficientNet-B0 weights loaded")
+        else:
+            print(
+                f"[ActivityDetector] WARNING — weights not found at {WEIGHTS_PATH}; "
+                "running with random weights (demo mode)"
+            )
+
+        self.efficientnet.to(self.device).eval()
+
+    # ── preprocessing ─────────────────────────────────────────────────
+    def _preprocess_crop(self, crop_bgr: np.ndarray) -> torch.Tensor:
+        """Resize to 224×224, normalise with ImageNet stats, return tensor."""
+        img = cv2.resize(crop_bgr, (224, 224))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        img = (img - IMAGENET_MEAN) / IMAGENET_STD
+        tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)  # (1,3,224,224)
+        return tensor.to(self.device)
+
+    # ── per-frame pipeline ────────────────────────────────────────────
+    @torch.no_grad()
+    def detect_frame(
+        self, frame_bgr: np.ndarray, pad: int = 20
+    ) -> Tuple[np.ndarray, List[Dict]]:
+        """
+        Run the full two-stage pipeline on a single BGR frame.
+
+        Returns:
+            annotated_frame (np.ndarray): frame with bounding boxes drawn
+            detections (list[dict]): each dict has keys
+                x1, y1, x2, y2, label, confidence
+        """
+        h, w = frame_bgr.shape[:2]
+        annotated = frame_bgr.copy()
+        detections: List[Dict] = []
+
+        # Stage 1 — YOLO person detection
+        results = self.yolo.predict(
+            frame_bgr, classes=[0], conf=0.4, verbose=False
+        )
+
+        if not results or len(results[0].boxes) == 0:
+            return annotated, detections
+
+        boxes = results[0].boxes
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            # pad crop
+            cx1 = max(0, x1 - pad)
+            cy1 = max(0, y1 - pad)
+            cx2 = min(w, x2 + pad)
+            cy2 = min(h, y2 + pad)
+            crop = frame_bgr[cy1:cy2, cx1:cx2]
+
+            if crop.size == 0:
+                continue
+
+            # Stage 2 — classify activity
+            tensor = self._preprocess_crop(crop)
+            logits = self.efficientnet(tensor)
+            probs = torch.softmax(logits, dim=1)[0]
+            conf, idx = probs.max(0)
+            conf_val = round(conf.item(), 3)
+            label = self.idx_to_class[idx.item()]
+
+            detections.append(
+                {
+                    "x1": x1,
+                    "y1": y1,
+                    "x2": x2,
+                    "y2": y2,
+                    "label": label,
+                    "confidence": conf_val,
+                }
+            )
+
+            # ── draw on annotated frame ─────────────────────────────
+            class_idx = idx.item() % len(BOX_COLOURS)
+            colour = BOX_COLOURS[class_idx]
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), colour, 2)
+
+            display_label = label.replace("_", " ").title()
+            text = f"{display_label} {conf_val:.0%}"
+            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+            cv2.rectangle(
+                annotated,
+                (x1, y1 - th - 10),
+                (x1 + tw + 6, y1),
+                colour,
+                -1,
+            )
+            cv2.putText(
+                annotated,
+                text,
+                (x1 + 3, y1 - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+
+        return annotated, detections
+
+
+# ── module-level singleton (lazy) ────────────────────────────────────────
+_detector: Optional[ActivityDetector] = None
+
+
+def get_detector() -> ActivityDetector:
+    """Return (and lazily initialise) the global ActivityDetector."""
+    global _detector
+    if _detector is None:
+        _detector = ActivityDetector()
+    return _detector
