@@ -12,7 +12,19 @@ This project demonstrates an end-to-end AI inference pipeline for human activity
 
 ### Inference Pipeline
 
-text Input Frame │ ▼ YOLOv8n Person Detection │ ▼ Person Cropping │ ▼ EfficientNet-B0 Activity Classification │ ▼ Annotated Output + Activity Logs
+Input Frame
+│
+▼
+YOLOv8n Person Detection
+│
+▼
+Person Cropping
+│
+▼
+EfficientNet-B0 Activity Classification
+│
+▼
+Annotated Output + Activity Logs
 
 For each frame:
 
@@ -105,7 +117,23 @@ The model predicts the following employee activities:
 
 ## Project Structure
 
-text employee_activity_detection/ │ ├── app/ │ ├── main.py │ ├── inference.py │ ├── models/ │ │ ├── efficientnet_b0_employee_activity.pth │ │ └── class_map.json │ ├── static/ │ │ └── index.html │ ├── uploads/ │ └── outputs/ │ ├── requirements.txt ├── requirements-lock.txt ├── README.md └── yolov8n.pt
+employee_activity_detection/
+│
+├── app/
+│ ├── main.py
+│ ├── inference.py
+│ ├── models/
+│ │ ├── efficientnet_b0_employee_activity.pth
+│ │ └── class_map.json
+│ ├── static/
+│ │ └── index.html
+│ ├── uploads/
+│ └── outputs/
+│
+├── requirements.txt
+├── requirements-lock.txt
+├── README.md
+└── yolov8n.pt
 
 ---
 
@@ -113,7 +141,8 @@ text employee_activity_detection/ │ ├── app/ │ ├── main.py │ �
 
 ### 1. Clone the Repository
 
-bash git clone <repository-url> cd employee_activity_detection
+git clone <repository-url>
+cd employee_activity_detection
 
 ### 2. Create a Virtual Environment
 
@@ -137,7 +166,9 @@ bash pip install -r requirements.txt
 
 Ensure the following files are available:
 
-text app/models/ ├── efficientnet_b0_employee_activity.pth └── class_map.json
+app/models/
+├── efficientnet_b0_employee_activity.pth
+└── class_map.json
 
 The application will still start without the trained weights, but predictions will be random.
 
@@ -147,7 +178,7 @@ bash uvicorn app.main:app --reload
 
 Open:
 
-text http://127.0.0.1:8000
+http://127.0.0.1:8000
 
 ---
 
