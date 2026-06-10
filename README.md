@@ -1,8 +1,21 @@
-# Employee Activity Detection
+# Employee Activity Detection using YOLOv8n and EfficientNet-B0
 
 A real-time computer vision application that detects employees in video streams and classifies their activities using a two-stage deep learning pipeline.
 
 The system combines YOLOv8n for person detection and EfficientNet-B0 for activity recognition, supporting both uploaded video analysis and live webcam inference through a FastAPI backend and browser-based interface.
+
+---
+
+## Key Highlights
+
+- Two-stage AI inference pipeline
+- YOLOv8n person detection
+- EfficientNet-B0 activity classification
+- Multi-person activity recognition
+- Real-time webcam inference via WebSockets
+- Video upload and background processing
+- Activity logging and alerting
+- FastAPI backend with browser-based UI
 
 ---
 
@@ -12,19 +25,21 @@ This project demonstrates an end-to-end AI inference pipeline for human activity
 
 ### Inference Pipeline
 
+```text
 Input Frame
-│
-▼
+    │
+    ▼
 YOLOv8n Person Detection
-│
-▼
+    │
+    ▼
 Person Cropping
-│
-▼
+    │
+    ▼
 EfficientNet-B0 Activity Classification
-│
-▼
+    │
+    ▼
 Annotated Output + Activity Logs
+```
 
 For each frame:
 
@@ -117,23 +132,27 @@ The model predicts the following employee activities:
 
 ## Project Structure
 
+```text
 employee_activity_detection/
-│
+├── .venv/
 ├── app/
-│ ├── main.py
-│ ├── inference.py
-│ ├── models/
-│ │ ├── efficientnet_b0_employee_activity.pth
-│ │ └── class_map.json
-│ ├── static/
-│ │ └── index.html
-│ ├── uploads/
-│ └── outputs/
-│
-├── requirements.txt
-├── requirements-lock.txt
+│   ├── __init__.py
+│   ├── main.py
+│   ├── inference.py
+│   ├── models/
+│   │   ├── class_map.json
+│   │   └── efficientnet_b0_employee_activity.pth
+│   ├── outputs/
+│   │   └── .gitkeep
+│   ├── static/
+│   │   └── index.html
+│   └── uploads/
+│       └── .gitkeep
+├── .gitignore
 ├── README.md
-└── yolov8n.pt
+├── requirements.txt
+
+```
 
 ---
 
@@ -141,44 +160,60 @@ employee_activity_detection/
 
 ### 1. Clone the Repository
 
+```bash
 git clone <repository-url>
 cd employee_activity_detection
+```
 
 ### 2. Create a Virtual Environment
 
-bash python -m venv .venv
+```bash
+python -m venv .venv
+```
 
 Activate the environment:
 
-macOS/Linux
+**macOS / Linux**
 
-bash source .venv/bin/activate
+```bash
+source .venv/bin/activate
+```
 
-Windows
+**Windows**
 
-bash .venv\Scripts\activate
+```bash
+.venv\Scripts\activate
+```
 
 ### 3. Install Dependencies
 
-bash pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
+```
 
 ### 4. Verify Model Files
 
 Ensure the following files are available:
 
+```text
 app/models/
 ├── efficientnet_b0_employee_activity.pth
 └── class_map.json
+```
 
 The application will still start without the trained weights, but predictions will be random.
 
 ### 5. Run the Application
 
-bash uvicorn app.main:app --reload
+```bash
+uvicorn app.main:app --reload
+```
 
-Open:
+Open your browser and navigate to:
 
+```text
 http://127.0.0.1:8000
+```
 
 ---
 
