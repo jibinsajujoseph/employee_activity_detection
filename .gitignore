@@ -147,3 +147,4 @@ data/interim/
 
 # Face recognition data
 app/models/employee_embeddings.json
+app/models/employee_photos/*
