@@ -644,6 +644,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
       Live Feed
     </a></li>
+    <li><a href="#" data-tab="employees" id="nav-employees">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Employees
+    </a></li>
     <li><a href="#" data-tab="log" id="nav-log">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       Activity Log
@@ -683,6 +687,10 @@
       <div class="card stat-card">
         <span class="label">Avg Confidence</span>
         <span class="value" id="stat-confidence">—</span>
+      </div>
+      <div class="card stat-card">
+        <span class="label">Identified Employees</span>
+        <span class="value" id="stat-identified">0</span>
       </div>
     </div>
 
@@ -768,6 +776,35 @@
     <canvas id="hidden-canvas" width="640" height="480" style="display:none"></canvas>
 
     <div class="activity-chips" id="activity-chips"></div>
+    <div class="activity-chips" id="active-employees-chips" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"></div>
+  </section>
+
+  <!-- ── Employees ───────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-employees">
+    <h2 class="tab-title">Employees</h2>
+    
+    <div class="card" style="margin-bottom: 24px;">
+      <h3 style="margin-bottom:14px;font-weight:600;">Enroll New Employee</h3>
+      <div style="display:flex; gap: 16px; margin-bottom: 16px;">
+        <input type="text" id="enroll-id" class="search-input" placeholder="Employee ID (e.g., EMP001)" style="max-width: 240px;">
+        <input type="text" id="enroll-name" class="search-input" placeholder="Full Name (e.g., Jane Smith)" style="flex: 1; max-width: 320px;">
+      </div>
+      <div class="drop-zone" id="enroll-drop-zone" style="padding: 32px; margin-bottom: 16px;">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <p>Drop photo(s) here, or <strong style="color:var(--accent)">click to browse</strong></p>
+        <img id="enroll-preview" style="display:none; max-height:100px; border-radius:var(--radius-sm); margin-top:12px; margin-left:auto; margin-right:auto;">
+        <p class="filename" id="enroll-filename"></p>
+      </div>
+      <input type="file" id="enroll-file-input" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden multiple />
+      <button class="btn btn-primary" id="btn-enroll">Enroll Employee</button>
+    </div>
+
+    <h3 style="margin-bottom:14px;font-weight:600;">Enrolled Employees</h3>
+    <div id="employees-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
+      <!-- Employee cards populated here -->
+    </div>
   </section>
 
   <!-- ── Activity Log ────────────────────────────────────── -->
@@ -784,6 +821,7 @@
           <tr>
             <th data-sort="timestamp">Timestamp ↕</th>
             <th data-sort="mode">Mode ↕</th>
+            <th data-sort="employee_name">Employee ↕</th>
             <th data-sort="label">Activity ↕</th>
             <th data-sort="confidence">Confidence ↕</th>
           </tr>
@@ -948,15 +986,20 @@
       // most common
       const counts = {};
       let totalConf = 0;
+      const uniqueEmployees = new Set();
       log.forEach(e => {
         counts[e.label] = (counts[e.label] || 0) + 1;
         totalConf += e.confidence;
+        if (e.employee_name && e.employee_name !== "Unknown") {
+          uniqueEmployees.add(e.employee_name);
+        }
       });
       const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
       const topLabel = sorted[0][0].replace(/_/g, " ");
       document.getElementById("stat-common").textContent = topLabel;
       document.getElementById("stat-confidence").textContent =
         (totalConf / log.length * 100).toFixed(1) + "%";
+      document.getElementById("stat-identified").textContent = uniqueEmployees.size;
 
       // doughnut chart
       updateDoughnut(counts);
@@ -1184,9 +1227,17 @@
       const detected = new Set((data.boxes || [])
         .filter(b => b.confidence >= 0.5)
         .map(b => b.label));
-      document.querySelectorAll(".chip").forEach(chip => {
+      document.querySelectorAll("#activity-chips .chip").forEach(chip => {
         chip.classList.toggle("active", detected.has(chip.dataset.cls));
       });
+      
+      const detectedEmployees = new Set((data.boxes || [])
+        .filter(b => b.employee_name && b.employee_name !== "Unknown")
+        .map(b => b.employee_name));
+      const empContainer = document.getElementById("active-employees-chips");
+      empContainer.innerHTML = Array.from(detectedEmployees).map(name => 
+        `<div class="chip active" style="background:rgba(34,197,94,0.1); border-color:var(--success); color:var(--success); box-shadow:none;">${name}</div>`
+      ).join("");
     };
 
     liveWs.onclose = () => {
@@ -1251,7 +1302,8 @@
     if (logSearch) {
       data = data.filter(e =>
         e.label.toLowerCase().includes(logSearch) ||
-        e.mode.toLowerCase().includes(logSearch)
+        e.mode.toLowerCase().includes(logSearch) ||
+        (e.employee_name && e.employee_name.toLowerCase().includes(logSearch))
       );
     }
     // sort
@@ -1279,6 +1331,7 @@
         <tr>
           <td>${ts}</td>
           <td><span class="badge ${e.mode === 'Live' ? 'badge-purple' : 'badge-green'}">${e.mode}</span></td>
+          <td style="color:${e.employee_name !== 'Unknown' ? 'var(--text)' : 'var(--text-muted)'}">${e.employee_name === 'Unknown' ? '—' : e.employee_name}</td>
           <td style="text-transform:capitalize">${e.label.replace(/_/g, " ")}</td>
           <td>
             <div class="inline-conf">
@@ -1371,6 +1424,143 @@
 
   buildAlertConfig();
 
+  // ═══════════════ EMPLOYEES ═════════════════════════════════════
+  const enrollDropZone = document.getElementById("enroll-drop-zone");
+  const enrollFileInput = document.getElementById("enroll-file-input");
+  const btnEnroll = document.getElementById("btn-enroll");
+  let enrollFiles = [];
+
+  enrollDropZone.addEventListener("click", () => enrollFileInput.click());
+  enrollDropZone.addEventListener("dragover", e => { e.preventDefault(); enrollDropZone.classList.add("dragover"); });
+  enrollDropZone.addEventListener("dragleave", () => enrollDropZone.classList.remove("dragover"));
+  enrollDropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    enrollDropZone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) handleEnrollFiles(e.dataTransfer.files);
+  });
+  enrollFileInput.addEventListener("change", () => {
+    if (enrollFileInput.files.length) handleEnrollFiles(enrollFileInput.files);
+  });
+
+  function handleEnrollFiles(files) {
+    enrollFiles = Array.from(files);
+    const nameEl = document.getElementById("enroll-filename");
+    const previewEl = document.getElementById("enroll-preview");
+    
+    if (enrollFiles.length === 1) {
+      nameEl.textContent = enrollFiles[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        previewEl.src = e.target.result;
+        previewEl.style.display = "block";
+      };
+      reader.readAsDataURL(enrollFiles[0]);
+    } else {
+      nameEl.textContent = `${enrollFiles.length} photos selected`;
+      previewEl.style.display = "none";
+    }
+  }
+
+  btnEnroll.addEventListener("click", async () => {
+    const empId = document.getElementById("enroll-id").value.trim();
+    const empName = document.getElementById("enroll-name").value.trim();
+    
+    if (!empId || !empName) {
+      showToast("Employee ID and Name are required.", "error");
+      return;
+    }
+    if (enrollFiles.length === 0) {
+      showToast("Please select at least one photo.", "error");
+      return;
+    }
+
+    const form = new FormData();
+    form.append("employee_id", empId);
+    form.append("name", empName);
+    
+    try {
+      btnEnroll.disabled = true;
+      if (enrollFiles.length === 1) {
+        form.append("photo", enrollFiles[0]);
+        const r = await apiFetch("/employees/enroll", { method: "POST", body: form });
+        const res = await r.json();
+        showToast(`Enrolled ${res.name} successfully.`, "success");
+      } else {
+        enrollFiles.forEach(f => form.append("photos", f));
+        const r = await apiFetch("/employees/enroll/batch", { method: "POST", body: form });
+        const res = await r.json();
+        showToast(`Enrolled ${res.name}: ${res.enrolled} photos added, ${res.skipped} skipped.`, "success");
+      }
+      
+      // Reset form
+      document.getElementById("enroll-id").value = "";
+      document.getElementById("enroll-name").value = "";
+      enrollFiles = [];
+      document.getElementById("enroll-filename").textContent = "";
+      document.getElementById("enroll-preview").style.display = "none";
+      enrollFileInput.value = "";
+      
+      fetchEmployees();
+    } catch (e) {
+      // Error handled in apiFetch, except maybe 400 with detail
+      console.error(e);
+    } finally {
+      btnEnroll.disabled = false;
+    }
+  });
+
+  let employeesList = [];
+  
+  async function fetchEmployees() {
+    try {
+      const r = await fetch("/employees");
+      employeesList = await r.json();
+      renderEmployees();
+    } catch { /* silent */ }
+  }
+  
+  function renderEmployees() {
+    const grid = document.getElementById("employees-grid");
+    if (!employeesList.length) {
+      grid.innerHTML = '<p style="color:var(--text-muted);font-size:0.88rem;">No employees enrolled yet.</p>';
+      return;
+    }
+    grid.innerHTML = employeesList.map(emp => {
+      const initials = emp.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+      return `
+        <div class="card" style="position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; padding: 20px 16px;">
+          <button class="btn-delete-emp" data-id="${emp.employee_id}" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--danger); cursor:pointer;" title="Delete Employee">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+          <img src="/employees/${emp.employee_id}/preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:12px;">
+          <div style="display:none; width:60px; height:60px; border-radius:50%; background:var(--surface-alt); align-items:center; justify-content:center; margin-bottom:12px; font-weight:bold; color:var(--text-muted); border: 1px solid var(--border)">
+            ${initials}
+          </div>
+          <div style="font-weight:700; font-size:0.95rem; margin-bottom:2px;">${emp.name}</div>
+          <div style="color:var(--text-muted); font-size:0.78rem; margin-bottom:12px;">${emp.employee_id}</div>
+          <span class="badge badge-purple">${emp.embedding_count} photos enrolled</span>
+        </div>
+      `;
+    }).join("");
+    
+    // Bind delete buttons
+    document.querySelectorAll('.btn-delete-emp').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        if(confirm(`Are you sure you want to delete employee ${id}?`)) {
+          const card = btn.closest('.card');
+          card.style.opacity = '0';
+          setTimeout(() => card.remove(), 300);
+          try {
+            await apiFetch(`/employees/${id}`, { method: 'DELETE' });
+            showToast('Employee deleted successfully', 'success');
+            fetchEmployees();
+          } catch {}
+        }
+      });
+    });
+  }
+
   // ═══════════════ EXPORT ════════════════════════════════════════
   document.getElementById("btn-export-csv").addEventListener("click", () => {
     window.location.href = "/export/csv";
@@ -1416,7 +1606,9 @@
 
   setInterval(fetchLog, 5000);
   setInterval(fetchAlerts, 5000);
+  setInterval(fetchEmployees, 30000);
   fetchLog();
+  fetchEmployees();
 
 })();
 </script>

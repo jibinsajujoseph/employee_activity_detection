@@ -15,6 +15,7 @@ import torch.nn as nn
 import timm
 from ultralytics import YOLO
 
+from .face_recognition import get_face_recognizer
 # ── paths ────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
@@ -70,6 +71,10 @@ class ActivityDetector:
         else:
             self.device = torch.device(device)
         print(f"[ActivityDetector] Using device: {self.device}")
+
+        # ── face cache ───────────────────────────────────────────────
+        self._face_cache = {}
+        self._next_track_id = 0
 
         # ── load class map ────────────────────────────────────────────
         with open(CLASS_MAP_PATH, "r") as f:
@@ -132,10 +137,27 @@ class ActivityDetector:
         tensor = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)  # (1,3,224,224)
         return tensor.to(self.device)
 
+    def reset_cache(self):
+        """Reset the face tracking cache (e.g. between videos)."""
+        self._face_cache = {}
+        self._next_track_id = 0
+
+    def _compute_iou(self, box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> float:
+        x1 = max(box1[0], box2[0])
+        y1 = max(box1[1], box2[1])
+        x2 = min(box1[2], box2[2])
+        y2 = min(box1[3], box2[3])
+        interArea = max(0, x2 - x1) * max(0, y2 - y1)
+        if interArea == 0:
+            return 0.0
+        box1Area = (box1[2] - box1[0]) * (box1[3] - box1[1])
+        box2Area = (box2[2] - box2[0]) * (box2[3] - box2[1])
+        return interArea / float(box1Area + box2Area - interArea)
+
     # ── per-frame pipeline ────────────────────────────────────────────
     @torch.no_grad()
     def detect_frame(
-        self, frame_bgr: np.ndarray, pad: int = 20
+        self, frame_bgr: np.ndarray, pad: int = 20, recognize_faces: bool = True
     ) -> Tuple[np.ndarray, List[Dict]]:
         """
         Run the full two-stage pipeline on a single BGR frame.
@@ -143,7 +165,7 @@ class ActivityDetector:
         Returns:
             annotated_frame (np.ndarray): frame with bounding boxes drawn
             detections (list[dict]): each dict has keys
-                x1, y1, x2, y2, label, confidence
+                x1, y1, x2, y2, label, confidence, employee_id, employee_name, face_similarity
         """
         h, w = frame_bgr.shape[:2]
         annotated = frame_bgr.copy()
@@ -158,8 +180,36 @@ class ActivityDetector:
             return annotated, detections
 
         boxes = results[0].boxes
+        
+        new_face_cache = {}
         for box in boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            
+            # ── Tracking ──────────────────────────────────────────────────
+            best_iou = 0
+            best_track_id = -1
+            for tid, tdata in self._face_cache.items():
+                iou = self._compute_iou((x1, y1, x2, y2), tdata["bbox"])
+                if iou > best_iou:
+                    best_iou = iou
+                    best_track_id = tid
+            
+            if best_iou > 0.4:
+                track_id = best_track_id
+                tdata = self._face_cache.pop(track_id)
+            else:
+                track_id = self._next_track_id
+                self._next_track_id += 1
+                tdata = {
+                    "employee_id": "unknown",
+                    "employee_name": "Unknown",
+                    "similarity": 0.0,
+                    "frame_count": 0
+                }
+            
+            tdata["bbox"] = (x1, y1, x2, y2)
+            tdata["frame_count"] += 1
+            
             # pad crop
             cx1 = max(0, x1 - pad)
             cy1 = max(0, y1 - pad)
@@ -168,7 +218,18 @@ class ActivityDetector:
             crop = frame_bgr[cy1:cy2, cx1:cx2]
 
             if crop.size == 0:
+                new_face_cache[track_id] = tdata
                 continue
+
+            # ── Face Recognition ──────────────────────────────────────────
+            if recognize_faces and (tdata["frame_count"] == 1 or tdata["frame_count"] % 10 == 0):
+                fr = get_face_recognizer()
+                res = fr.identify(crop)
+                tdata["employee_id"] = res["employee_id"]
+                tdata["employee_name"] = res["name"]
+                tdata["similarity"] = res["similarity"]
+            
+            new_face_cache[track_id] = tdata
 
             # Stage 2 — classify activity
             tensor = self._preprocess_crop(crop)
@@ -186,27 +247,50 @@ class ActivityDetector:
                     "y2": y2,
                     "label": label,
                     "confidence": conf_val,
+                    "employee_id": tdata["employee_id"],
+                    "employee_name": tdata["employee_name"],
+                    "face_similarity": tdata["similarity"],
                 }
             )
 
             # ── draw on annotated frame ─────────────────────────────
             class_idx = idx.item() % len(BOX_COLOURS)
             colour = BOX_COLOURS[class_idx]
-            cv2.rectangle(annotated, (x1, y1), (x2, y2), colour, 2)
+            
+            is_identified = tdata["employee_id"] != "unknown"
+            thickness = 3 if is_identified else 2
+            cv2.rectangle(annotated, (x1, y1), (x2, y2), colour, thickness)
 
             display_label = label.replace("_", " ").title()
-            text = f"{display_label} {conf_val:.0%}"
-            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+            emp_text = tdata["employee_name"]
+            act_text = f"{display_label} {conf_val:.0%}"
+            
+            (tw_emp, th_emp), _ = cv2.getTextSize(emp_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+            (tw_act, th_act), _ = cv2.getTextSize(act_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+            
+            box_w = max(tw_emp, tw_act)
+            total_h = th_emp + th_act + 15
+            
             cv2.rectangle(
                 annotated,
-                (x1, y1 - th - 10),
-                (x1 + tw + 6, y1),
+                (x1, y1 - total_h - 10),
+                (x1 + box_w + 6, y1),
                 colour,
                 -1,
             )
             cv2.putText(
                 annotated,
-                text,
+                emp_text,
+                (x1 + 3, y1 - th_act - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (255, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
+            cv2.putText(
+                annotated,
+                act_text,
                 (x1 + 3, y1 - 5),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
@@ -214,6 +298,8 @@ class ActivityDetector:
                 1,
                 cv2.LINE_AA,
             )
+            
+        self._face_cache = new_face_cache
 
         return annotated, detections
 

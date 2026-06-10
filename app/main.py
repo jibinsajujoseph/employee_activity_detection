@@ -20,6 +20,7 @@ from fastapi import (
     BackgroundTasks,
     FastAPI,
     File,
+    Form,
     HTTPException,
     UploadFile,
     WebSocket,
@@ -31,14 +32,17 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import HTMLResponse
 
 from .inference import get_detector
+from .face_recognition import get_face_recognizer
 
 # ── paths ────────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "outputs"
+MODEL_DIR = BASE_DIR / "models"
+PHOTOS_DIR = MODEL_DIR / "employee_photos"
 
-for d in (STATIC_DIR, UPLOAD_DIR, OUTPUT_DIR):
+for d in (STATIC_DIR, UPLOAD_DIR, OUTPUT_DIR, MODEL_DIR, PHOTOS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # ── in-memory stores ────────────────────────────────────────────────────
@@ -60,12 +64,14 @@ app.add_middleware(
 
 
 # ── helpers ──────────────────────────────────────────────────────────────
-def _append_log(mode: str, label: str, confidence: float):
+def _append_log(mode: str, label: str, confidence: float, employee_id: str = "unknown", employee_name: str = "Unknown"):
     entry = {
         "timestamp": datetime.now().isoformat(),
         "mode": mode,
         "label": label,
         "confidence": round(confidence, 3),
+        "employee_id": employee_id,
+        "employee_name": employee_name,
     }
     activity_log.append(entry)
     if len(activity_log) > MAX_LOG:
@@ -92,6 +98,7 @@ def _check_alerts(entry: Dict):
 def _process_video(job_id: str, input_path: str):
     """Process an uploaded video frame-by-frame (runs in background thread)."""
     detector = get_detector()
+    detector.reset_cache()
     cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
         video_jobs[job_id]["status"] = "error"
@@ -116,7 +123,7 @@ def _process_video(job_id: str, input_path: str):
         annotated, dets = detector.detect_frame(frame)
         writer.write(annotated)
         for d in dets:
-            _append_log("Video", d["label"], d["confidence"])
+            _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
             job_detections.append(d)
         frame_idx += 1
         video_jobs[job_id]["progress"] = min(
@@ -267,7 +274,7 @@ async def video_stream(websocket: WebSocket):
 
             # log detections
             for d in dets:
-                _append_log("Live", d["label"], d["confidence"])
+                _append_log("Live", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
 
             # encode annotated frame back to base64 JPEG
             _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -298,7 +305,7 @@ async def get_activity_log():
 async def export_csv():
     buf = io.StringIO()
     writer = csv.DictWriter(
-        buf, fieldnames=["timestamp", "mode", "label", "confidence"]
+        buf, fieldnames=["timestamp", "mode", "label", "confidence", "employee_id", "employee_name"]
     )
     writer.writeheader()
     for row in activity_log:
@@ -328,6 +335,89 @@ async def get_alert_config():
 @app.get("/alerts")
 async def get_alerts():
     return triggered_alerts[-100:]
+
+
+# ── Employees ────────────────────────────────────────────────────────────
+@app.post("/employees/enroll")
+async def enroll_employee(
+    employee_id: str = Form(...),
+    name: str = Form(...),
+    photo: UploadFile = File(...)
+):
+    content = await photo.read()
+    nparr = np.frombuffer(content, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise HTTPException(400, "Invalid image format")
+    
+    fr = get_face_recognizer()
+    try:
+        res = fr.enroll(employee_id, name, img)
+    except ValueError as e:
+        raise HTTPException(400, detail="No face detected in the uploaded image")
+        
+    # Save first photo for preview
+    if res.get("embedding_count") == 1:
+        photo_path = PHOTOS_DIR / f"{employee_id}.jpg"
+        cv2.imwrite(str(photo_path), img)
+        
+    return res
+
+@app.post("/employees/enroll/batch")
+async def enroll_employee_batch(
+    employee_id: str = Form(...),
+    name: str = Form(...),
+    photos: List[UploadFile] = File(...)
+):
+    enrolled = 0
+    skipped = 0
+    fr = get_face_recognizer()
+    
+    for photo in photos:
+        content = await photo.read()
+        nparr = np.frombuffer(content, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            skipped += 1
+            continue
+            
+        try:
+            res = fr.enroll(employee_id, name, img)
+            enrolled += 1
+            if res.get("embedding_count") == 1:
+                photo_path = PHOTOS_DIR / f"{employee_id}.jpg"
+                cv2.imwrite(str(photo_path), img)
+        except ValueError:
+            skipped += 1
+            
+    return {"enrolled": enrolled, "skipped": skipped, "employee_id": employee_id, "name": name}
+
+@app.get("/employees")
+async def get_employees():
+    fr = get_face_recognizer()
+    return fr.get_all_employees()
+
+@app.get("/employees/{employee_id}")
+async def get_employee(employee_id: str):
+    fr = get_face_recognizer()
+    emp = next((e for e in fr.get_all_employees() if e["employee_id"] == employee_id), None)
+    if not emp:
+        raise HTTPException(404, "Employee not found")
+    return emp
+
+@app.delete("/employees/{employee_id}")
+async def delete_employee(employee_id: str):
+    fr = get_face_recognizer()
+    if fr.delete_employee(employee_id):
+        return {"status": "deleted"}
+    raise HTTPException(404, "Employee not found")
+
+@app.get("/employees/{employee_id}/preview")
+async def preview_employee(employee_id: str):
+    photo_path = PHOTOS_DIR / f"{employee_id}.jpg"
+    if not photo_path.exists():
+        raise HTTPException(404, "Photo not found")
+    return FileResponse(str(photo_path), media_type="image/jpeg")
 
 
 # ── Health / meta ────────────────────────────────────────────────────────
