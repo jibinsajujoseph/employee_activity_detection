@@ -1,109 +1,197 @@
-# ActivityWatch — Employee Activity Detection
+# Employee Activity Detection
 
-A real-time employee activity detection web application powered by **YOLOv8n** (person detection) and **EfficientNet-B0** (activity classification). Runs locally on `localhost` with a modern dark-themed UI.
+A real-time computer vision application that detects employees in video streams and classifies their activities using a two-stage deep learning pipeline.
 
-## 🏗️ Architecture
+The system combines YOLOv8n for person detection and EfficientNet-B0 for activity recognition, supporting both uploaded video analysis and live webcam inference through a FastAPI backend and browser-based interface.
 
-```
-┌─────────────┐   frames    ┌──────────────────┐   detections   ┌──────────┐
-│   Browser    │ ──────────► │  FastAPI Backend  │ ─────────────► │  Frontend │
-│  (Webcam /   │ ◄────────── │                  │                │  Display  │
-│   Upload)    │  annotated  │  YOLOv8n → Crop  │                └──────────┘
-└─────────────┘   frames    │  → EfficientNet  │
-                             └──────────────────┘
-```
+---
 
-**Two-stage inference pipeline:**
-1. **YOLOv8n** — detects persons in the frame (class 0, conf ≥ 0.4)
-2. **EfficientNet-B0** — classifies each detected person's activity from 15 categories
+## Overview
 
-## 📋 Activity Classes
+This project demonstrates an end-to-end AI inference pipeline for human activity recognition in workplace environments.
 
-| # | Activity | # | Activity |
-|---|----------|---|----------|
-| 0 | Applauding Presentation | 8 | Messaging on Phone |
-| 1 | At Team Celebration | 9 | On Lunch Break |
-| 2 | Commuting by Bike | 10 | On Phone Call |
-| 3 | Enjoying Team Meeting | 11 | Rushing to Meeting |
-| 4 | Greeting Colleague | 12 | Taking a Nap |
-| 5 | Having Coffee Break | 13 | Working at Desk |
-| 6 | In Heated Discussion | 14 | Working on Laptop |
-| 7 | Listening with Headphones | | |
+### Inference Pipeline
 
-## 🚀 Setup & Run
+text Input Frame │ ▼ YOLOv8n Person Detection │ ▼ Person Cropping │ ▼ EfficientNet-B0 Activity Classification │ ▼ Annotated Output + Activity Logs
 
-### 1. Install dependencies
+For each frame:
 
-```bash
-pip install -r requirements.txt
-```
+1. YOLOv8n detects all people present in the scene.
+2. Each detected person is cropped from the frame.
+3. EfficientNet-B0 classifies the activity being performed.
+4. Bounding boxes, labels, and confidence scores are rendered on the output frame.
+5. Results are logged and made available through the API.
 
-### 2. Place model files
+---
 
-Copy your trained model weights into the `app/models/` directory:
+## Activity Classes
 
-```
-app/models/
-  ├── efficientnet_b0_employee_activity.pth   # trained EfficientNet-B0 weights
-  └── class_map.json                           # class mapping (already included)
-```
+The model predicts the following employee activities:
 
-> **Note:** If the `.pth` file is not present, the app will still run in demo mode with random weights.
+| Class | Activity                  |
+| ----- | ------------------------- |
+| 0     | Applauding Presentation   |
+| 1     | At Team Celebration       |
+| 2     | Commuting by Bike         |
+| 3     | Enjoying Team Meeting     |
+| 4     | Greeting Colleague        |
+| 5     | Having Coffee Break       |
+| 6     | In Heated Discussion      |
+| 7     | Listening with Headphones |
+| 8     | Messaging on Phone        |
+| 9     | On Lunch Break            |
+| 10    | On Phone Call             |
+| 11    | Rushing to Meeting        |
+| 12    | Taking a Nap              |
+| 13    | Working at Desk           |
+| 14    | Working on Laptop         |
 
-### 3. Run the application
+---
 
-```bash
-uvicorn app.main:app --reload
-```
+## Features
 
-Open your browser at **http://localhost:8000**
+### Video Upload Processing
 
-## 🎯 Features
+- Upload MP4, AVI, or MOV videos
+- Background processing using FastAPI tasks
+- Annotated output video generation
+- Progress tracking through API endpoints
 
-| Feature | Description |
-|---------|-------------|
-| **Dashboard** | Live stats, activity distribution chart, detection timeline |
-| **Upload Video** | Drag-and-drop MP4/AVI, background processing, annotated output |
-| **Live Feed** | Real-time webcam detection via WebSocket (~10 FPS) |
-| **Activity Log** | Searchable, sortable, paginated table with confidence bars |
-| **Alerts** | Per-class toggle + threshold slider, live alert feed |
-| **Export** | CSV download of all detections, annotated video download |
+### Live Webcam Inference
 
-## 🔌 API Endpoints
+- Real-time frame processing via WebSocket
+- Multi-person detection support
+- Live bounding boxes and activity labels
+- FPS reporting
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/upload` | Upload video for processing |
-| `GET` | `/video-status/{job_id}` | Check processing progress |
-| `GET` | `/video-result/{job_id}` | Download annotated video |
-| `WS` | `/video-stream` | Live WebSocket frame processing |
-| `GET` | `/activity-log` | Last 500 detection events |
-| `GET` | `/export/csv` | Download full activity log as CSV |
-| `POST` | `/alerts/config` | Configure alert thresholds |
-| `GET` | `/alerts` | Recent triggered alerts |
-| `GET` | `/health` | Backend health check |
+### Activity Monitoring
 
-## 📁 Project Structure
+- Detection history logging
+- Confidence score tracking
+- Activity statistics and summaries
+- CSV export functionality
 
-```
-employee_activity_detection/
-├── app/
-│   ├── __init__.py
-│   ├── main.py              # FastAPI app with all routes
-│   ├── inference.py          # YOLOv8n + EfficientNet-B0 pipeline
-│   ├── models/
-│   │   ├── efficientnet_b0_employee_activity.pth
-│   │   └── class_map.json
-│   ├── static/
-│   │   └── index.html        # Single-page frontend
-│   ├── uploads/               # Temporary uploaded videos
-│   └── outputs/               # Annotated output videos
-├── requirements.txt
-└── README.md
-```
+### Alert System
 
-## ⚙️ Requirements
+- Activity-specific alert configuration
+- Confidence threshold settings
+- Triggered alert tracking
 
-- Python 3.9+
-- GPU recommended (CUDA) for real-time inference, but CPU works for demo
-- Modern browser with WebSocket and `getUserMedia` support
+---
+
+## Technology Stack
+
+### Backend
+
+- FastAPI
+- Uvicorn
+- OpenCV
+- WebSockets
+
+### Deep Learning
+
+- YOLOv8n
+- EfficientNet-B0
+- PyTorch
+- TIMM
+
+### Frontend
+
+- HTML
+- JavaScript
+- WebSocket API
+
+---
+
+## Project Structure
+
+text employee_activity_detection/ │ ├── app/ │ ├── main.py │ ├── inference.py │ ├── models/ │ │ ├── efficientnet_b0_employee_activity.pth │ │ └── class_map.json │ ├── static/ │ │ └── index.html │ ├── uploads/ │ └── outputs/ │ ├── requirements.txt ├── requirements-lock.txt ├── README.md └── yolov8n.pt
+
+---
+
+## Setup
+
+### 1. Clone the Repository
+
+bash git clone <repository-url> cd employee_activity_detection
+
+### 2. Create a Virtual Environment
+
+bash python -m venv .venv
+
+Activate the environment:
+
+macOS/Linux
+
+bash source .venv/bin/activate
+
+Windows
+
+bash .venv\Scripts\activate
+
+### 3. Install Dependencies
+
+bash pip install -r requirements.txt
+
+### 4. Verify Model Files
+
+Ensure the following files are available:
+
+text app/models/ ├── efficientnet_b0_employee_activity.pth └── class_map.json
+
+The application will still start without the trained weights, but predictions will be random.
+
+### 5. Run the Application
+
+bash uvicorn app.main:app --reload
+
+Open:
+
+text http://127.0.0.1:8000
+
+---
+
+## API Endpoints
+
+| Method | Endpoint               | Description                   |
+| ------ | ---------------------- | ----------------------------- |
+| POST   | /upload                | Upload a video for processing |
+| GET    | /video-status/{job_id} | Retrieve processing progress  |
+| GET    | /video-result/{job_id} | Download annotated video      |
+| WS     | /video-stream          | Real-time webcam inference    |
+| GET    | /activity-log          | Recent detection events       |
+| GET    | /export/csv            | Export activity log as CSV    |
+| POST   | /alerts/config         | Configure alert thresholds    |
+| GET    | /alerts                | Retrieve recent alerts        |
+| GET    | /health                | Application health status     |
+
+---
+
+## Sample Workflow
+
+1. Start the FastAPI server.
+2. Open the web interface in a browser.
+3. Upload a video or start the webcam stream.
+4. The backend detects people using YOLOv8n.
+5. EfficientNet-B0 classifies activities for each detected person.
+6. Results are displayed with labels and confidence scores.
+7. Logs and alerts are generated automatically.
+
+---
+
+## Future Improvements
+
+- Model quantization and optimization
+- Object tracking across frames
+- Persistent database storage
+- User authentication
+- Docker deployment
+- GPU acceleration enhancements
+- Cloud-based inference deployment
+- Analytics dashboard and reporting
+
+---
+
+## License
+
+This project was developed as an AI Engineering portfolio project demonstrating real-time computer vision, deep learning inference pipelines, and FastAPI-based deployment.
