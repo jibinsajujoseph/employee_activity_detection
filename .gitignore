@@ -144,3 +144,6 @@ data/interim/
 
 # Keep class mappings:
 # app/models/class_map.json
+
+# Face recognition data
+app/models/employee_embeddings.json
