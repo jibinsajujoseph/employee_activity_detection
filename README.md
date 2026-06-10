@@ -156,6 +156,49 @@ employee_activity_detection/
 
 ---
 
+## Prerequisites
+
+### Python
+
+- Python 3.10 or higher
+
+Verify:
+
+```bash
+python --version
+```
+
+### FFmpeg
+
+This project uses FFmpeg to convert annotated videos into a browser-compatible MP4 format (H.264).
+
+Verify installation:
+
+```bash
+ffmpeg -version
+```
+
+#### Windows
+
+Install using Winget:
+
+```powershell
+winget install ffmpeg
+```
+
+Or download from:
+https://ffmpeg.org/download.html
+
+#### macOS
+
+Using Homebrew:
+
+```bash
+brew install ffmpeg
+```
+
+---
+
 ## Setup
 
 ### 1. Clone the Repository

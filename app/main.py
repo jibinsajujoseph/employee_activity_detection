@@ -146,6 +146,11 @@ def _process_video(job_id: str, input_path: str):
         if os.path.exists(raw_output_path):
             os.remove(raw_output_path)
 
+    except FileNotFoundError:
+        video_jobs[job_id]["status"] = "error"
+        print("FFmpeg not found. Install FFmpeg and add it to PATH.")
+        return
+    
     except subprocess.CalledProcessError as e:
         video_jobs[job_id]["status"] = "error"
         print("FFmpeg conversion failed:", e.stderr.decode(errors="ignore"))
