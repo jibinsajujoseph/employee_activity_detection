@@ -11,6 +11,7 @@ import json
 import os
 import time
 import uuid
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -103,9 +104,10 @@ def _process_video(job_id: str, input_path: str):
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+    raw_output_path = str(OUTPUT_DIR / f"{job_id}_raw.mp4")
     output_path = str(OUTPUT_DIR / f"{job_id}.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(output_path, fourcc, fps, (w, h))
+    writer = cv2.VideoWriter(raw_output_path, fourcc, fps, (w, h))
 
     frame_idx = 0
     job_detections: List[Dict] = []
@@ -125,6 +127,31 @@ def _process_video(job_id: str, input_path: str):
 
     cap.release()
     writer.release()
+
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                raw_output_path,
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                output_path,
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+        if os.path.exists(raw_output_path):
+            os.remove(raw_output_path)
+
+    except subprocess.CalledProcessError as e:
+        video_jobs[job_id]["status"] = "error"
+        print("FFmpeg conversion failed:", e.stderr.decode(errors="ignore"))
+        return
 
     video_jobs[job_id].update(
         {
