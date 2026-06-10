@@ -3,11 +3,9 @@ FastAPI application — Employee Activity Detection
 All routes: upload, video processing, live WebSocket, activity log, alerts, export.
 """
 
-import asyncio
 import base64
 import csv
 import io
-import json
 import os
 import time
 import uuid
