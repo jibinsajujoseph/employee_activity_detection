@@ -339,5 +339,5 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 async def root():
     index = STATIC_DIR / "index.html"
     if index.exists():
-        return HTMLResponse(index.read_text())
+        return HTMLResponse(index.read_text(encoding="utf-8"))
     return HTMLResponse("<h1>ActivityWatch</h1><p>Frontend not found.</p>")
