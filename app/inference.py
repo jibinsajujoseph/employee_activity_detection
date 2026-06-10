@@ -87,19 +87,36 @@ class ActivityDetector:
         print("[ActivityDetector] YOLOv8n loaded")
 
         # ── Stage 2: EfficientNet-B0 + custom head ───────────────────
-        backbone = timm.create_model(
+        self.efficientnet = timm.create_model(
             "efficientnet_b0",
             pretrained=False,
             num_classes=0,
             global_pool="avg",
         )
-        self.classifier_head = _build_classifier_head(self.num_classes)
-        self.efficientnet = nn.Sequential(backbone, self.classifier_head)
+
+        in_features = self.efficientnet.num_features
+
+        self.efficientnet.classifier = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(in_features, 512),
+            nn.SiLU(),
+            nn.Dropout(0.2),
+            nn.Linear(512, self.num_classes),
+        )
 
         if WEIGHTS_PATH.exists():
-            state = torch.load(str(WEIGHTS_PATH), map_location=self.device, weights_only=False)
-            self.efficientnet.load_state_dict(state, strict=False)
-            print("[ActivityDetector] EfficientNet-B0 weights loaded")
+            checkpoint = torch.load(
+                str(WEIGHTS_PATH),
+                map_location=self.device,
+                weights_only=False
+            )
+
+            self.efficientnet.load_state_dict(
+                checkpoint["model_state_dict"],
+                strict=True,
+            )
+
+            print("[ActivityDetector] EfficientNet-B0 weights loaded successfully")
         else:
             print(
                 f"[ActivityDetector] WARNING — weights not found at {WEIGHTS_PATH}; "
