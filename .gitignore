@@ -150,5 +150,3 @@ app/models/employee_embeddings.json
 app/models/employee_photos/*
 
 !app/models/employee_photos/.gitkeep
-
-notebooks/
