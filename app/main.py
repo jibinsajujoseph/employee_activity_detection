@@ -9,12 +9,14 @@ import csv
 import io
 import logging
 import os
+import subprocess
 import time
 import uuid
-import subprocess
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from threading import Lock
+from typing import Any, Dict, List, Optional, Set
 
 import cv2
 import numpy as np
@@ -48,11 +50,14 @@ for d in (STATIC_DIR, UPLOAD_DIR, OUTPUT_DIR, MODEL_DIR, PHOTOS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 # ── in-memory stores ────────────────────────────────────────────────────
-activity_log: List[Dict] = []                       # last N detection events
-alert_configs: List[Dict] = []                      # [{label, threshold}]
-triggered_alerts: List[Dict] = []                   # recent alerts
+activity_log: List[Dict[str, Any]] = []             # raw detection events
+event_log: List[Dict[str, Any]] = []                # manager-facing event log
+alert_configs: List[Dict[str, Any]] = []            # legacy per-class config
+triggered_alerts: List[Dict[str, Any]] = []         # alert history
 video_jobs: Dict[str, Dict] = {}                    # job_id → {progress, output_path, status, detections}
 MAX_LOG = 5000
+MAX_EVENT_LOG = 2000
+MAX_ALERTS = 500
 
 # ── performance stats ───────────────────────────────────────────────────
 recent_inference_times = collections.deque(maxlen=100)
@@ -70,35 +75,504 @@ app.add_middleware(
 )
 
 
-# ── helpers ──────────────────────────────────────────────────────────────
-def _append_log(mode: str, label: str, confidence: float, employee_id: str = "unknown", employee_name: str = "Unknown"):
-    entry = {
-        "timestamp": datetime.now().isoformat(),
-        "mode": mode,
-        "label": label,
-        "confidence": round(confidence, 3),
-        "employee_id": employee_id,
-        "employee_name": employee_name,
-    }
-    activity_log.append(entry)
-    if len(activity_log) > MAX_LOG:
-        del activity_log[: len(activity_log) - MAX_LOG]
-    _check_alerts(entry)
+PRODUCTIVE_ACTIVITIES = {
+    "working_at_desk",
+    "working_on_laptop",
+    "enjoying_team_meeting",
+    "applauding_presentation",
+}
+
+NON_PRODUCTIVE_ACTIVITIES = {
+    "taking_a_nap",
+    "on_lunch_break",
+    "having_coffee_break",
+    "messaging_on_phone",
+    "on_phone_call",
+}
+
+DEFAULT_ALERT_SETTINGS = {
+    "inactivity_threshold": 10.0,
+    "nap_threshold": 5.0,
+    "unknown_person_threshold": 3.0,
+}
+
+ALERT_COOLDOWN_BY_TYPE = {
+    "inactivity": 10.0,
+    "nap": 5.0,
+    "unknown_person": 3.0,
+}
+
+ALERT_SEVERITY_RANK = {
+    "warning": 1,
+    "critical": 2,
+}
 
 
-def _check_alerts(entry: Dict):
-    for cfg in alert_configs:
-        if cfg.get("enabled", True) and entry["label"] == cfg["label"]:
-            if entry["confidence"] >= cfg["threshold"]:
-                alert = {
-                    "id": str(uuid.uuid4())[:8],
-                    "timestamp": entry["timestamp"],
-                    "label": entry["label"],
-                    "confidence": entry["confidence"],
+def _trim_buffer(items: List[Dict[str, Any]], max_size: int) -> None:
+    if len(items) > max_size:
+        del items[: len(items) - max_size]
+
+
+def _now_iso() -> str:
+    return datetime.now().isoformat()
+
+
+def _display_name(employee_name: str, fallback: str = "Unknown person") -> str:
+    if employee_name and employee_name != "Unknown":
+        return employee_name
+    return fallback
+
+
+@dataclass
+class AlertSettings:
+    inactivity_threshold: float = DEFAULT_ALERT_SETTINGS["inactivity_threshold"]
+    nap_threshold: float = DEFAULT_ALERT_SETTINGS["nap_threshold"]
+    unknown_person_threshold: float = DEFAULT_ALERT_SETTINGS["unknown_person_threshold"]
+
+
+@dataclass
+class SubjectState:
+    source_id: str
+    track_id: str
+    mode: str
+    employee_id: str = "unknown"
+    employee_name: str = "Unknown"
+    recognized: bool = False
+    first_seen_at: float = 0.0
+    last_seen_at: float = 0.0
+    last_seen_timestamp: str = ""
+    last_label: str = ""
+    last_confidence: float = 0.0
+    last_productive_at: Optional[float] = None
+    has_seen_productive: bool = False
+    was_productive: bool = False
+    inactivity_alert_active: bool = False
+    nap_started_at: Optional[float] = None
+    nap_alert_active: bool = False
+    unknown_started_at: Optional[float] = None
+    unknown_alert_active: bool = False
+
+
+class MonitoringState:
+    def __init__(self) -> None:
+        self.lock = Lock()
+        self.settings = AlertSettings()
+        self.total_detections = 0
+        self.productive_detections = 0
+        self.activity_counts: collections.Counter[str] = collections.Counter()
+        self.unique_recognized_employee_ids: Set[str] = set()
+        self.employee_productivity: Dict[str, Dict[str, Any]] = {}
+        self.subjects: Dict[str, SubjectState] = {}
+        self.subjects_by_source: Dict[str, Set[str]] = {}
+        self.active_alerts: Dict[str, Dict[str, Any]] = {}
+        self.last_alert_times: Dict[str, float] = {}
+
+    def get_alert_settings(self) -> Dict[str, float]:
+        return asdict(self.settings)
+
+    def update_alert_settings(self, payload: Dict[str, Any]) -> Dict[str, float]:
+        with self.lock:
+            for key in DEFAULT_ALERT_SETTINGS:
+                value = payload.get(key, getattr(self.settings, key))
+                try:
+                    numeric_value = float(value)
+                except (TypeError, ValueError):
+                    numeric_value = getattr(self.settings, key)
+                setattr(self.settings, key, max(1.0, numeric_value))
+            return self.get_alert_settings()
+
+    def _append_event(
+        self,
+        mode: str,
+        event_type: str,
+        message: str,
+        employee_id: str,
+        employee_name: str,
+        severity: str = "warning",
+        label: str = "",
+    ) -> None:
+        event_log.append(
+            {
+                "id": str(uuid.uuid4())[:8],
+                "timestamp": _now_iso(),
+                "mode": mode,
+                "event_type": event_type,
+                "message": message,
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "severity": severity,
+                "label": label or event_type,
+            }
+        )
+        _trim_buffer(event_log, MAX_EVENT_LOG)
+
+    def _resolve_alert(self, alert_key: str) -> None:
+        alert = self.active_alerts.pop(alert_key, None)
+        if alert:
+            alert["active"] = False
+            alert["resolved_at"] = _now_iso()
+
+    def _activate_alert(
+        self,
+        *,
+        alert_key: str,
+        alert_type: str,
+        employee_id: str,
+        employee_name: str,
+        severity: str,
+        message: str,
+        observed_at: float,
+    ) -> bool:
+        if alert_key in self.active_alerts:
+            return False
+        cooldown = ALERT_COOLDOWN_BY_TYPE[alert_type]
+        if observed_at - self.last_alert_times.get(alert_key, float("-inf")) < cooldown:
+            return False
+
+        alert = {
+            "id": str(uuid.uuid4())[:8],
+            "timestamp": _now_iso(),
+            "employee_id": employee_id,
+            "employee_name": employee_name,
+            "alert_type": alert_type,
+            "message": message,
+            "severity": severity,
+            "active": True,
+        }
+        self.active_alerts[alert_key] = alert
+        self.last_alert_times[alert_key] = observed_at
+        triggered_alerts.append(alert)
+        _trim_buffer(triggered_alerts, MAX_ALERTS)
+        return True
+
+    def _update_employee_productivity(
+        self,
+        employee_id: str,
+        employee_name: str,
+        is_productive: bool,
+    ) -> None:
+        if employee_id == "unknown":
+            return
+        bucket = self.employee_productivity.setdefault(
+            employee_id,
+            {
+                "employee_id": employee_id,
+                "employee_name": employee_name,
+                "productive_events": 0,
+                "total_events": 0,
+            },
+        )
+        bucket["employee_name"] = employee_name
+        bucket["total_events"] += 1
+        if is_productive:
+            bucket["productive_events"] += 1
+
+    def _subject_key(self, source_id: str, track_id: Any) -> str:
+        return f"{source_id}:{track_id}"
+
+    def _upsert_subject(
+        self,
+        *,
+        source_id: str,
+        mode: str,
+        track_id: str,
+        observed_at: float,
+        timestamp: str,
+    ) -> SubjectState:
+        subject_key = self._subject_key(source_id, track_id)
+        subject = self.subjects.get(subject_key)
+        if subject is None:
+            subject = SubjectState(
+                source_id=source_id,
+                track_id=track_id,
+                mode=mode,
+                first_seen_at=observed_at,
+                last_seen_at=observed_at,
+                last_seen_timestamp=timestamp,
+            )
+            self.subjects[subject_key] = subject
+        subject.mode = mode
+        subject.last_seen_at = observed_at
+        subject.last_seen_timestamp = timestamp
+        return subject
+
+    def _clear_subject_alerts(self, subject_key: str, subject: SubjectState) -> None:
+        for alert_type in ("inactivity", "nap", "unknown_person"):
+            self._resolve_alert(f"{subject_key}:{alert_type}")
+        subject.inactivity_alert_active = False
+        subject.nap_alert_active = False
+        subject.unknown_alert_active = False
+        subject.nap_started_at = None
+        subject.unknown_started_at = None
+
+    def record_frame(
+        self,
+        *,
+        source_id: str,
+        mode: str,
+        detections: List[Dict[str, Any]],
+        observed_at: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        with self.lock:
+            frame_time = observed_at if observed_at is not None else time.time()
+            timestamp = _now_iso()
+            current_subject_keys: Set[str] = set()
+
+            for detection_index, detection in enumerate(detections):
+                track_id = str(detection.get("track_id", detection_index))
+                subject_key = self._subject_key(source_id, track_id)
+                current_subject_keys.add(subject_key)
+                subject = self._upsert_subject(
+                    source_id=source_id,
+                    mode=mode,
+                    track_id=track_id,
+                    observed_at=frame_time,
+                    timestamp=timestamp,
+                )
+
+                employee_id = detection.get("employee_id") or "unknown"
+                employee_name = detection.get("employee_name") or "Unknown"
+                label = detection.get("label") or "unknown_activity"
+                confidence = round(float(detection.get("confidence", 0.0)), 3)
+                recognized = employee_id != "unknown"
+                is_productive = label in PRODUCTIVE_ACTIVITIES
+
+                subject.employee_id = employee_id
+                subject.employee_name = employee_name
+                subject.recognized = recognized
+                subject.last_label = label
+                subject.last_confidence = confidence
+
+                raw_entry = {
+                    "timestamp": timestamp,
+                    "mode": mode,
+                    "label": label,
+                    "confidence": confidence,
+                    "employee_id": employee_id,
+                    "employee_name": employee_name,
+                    "source_id": source_id,
+                    "track_id": track_id,
+                    "productive": is_productive,
                 }
-                triggered_alerts.append(alert)
-                if len(triggered_alerts) > 500:
-                    del triggered_alerts[:100]
+                activity_log.append(raw_entry)
+                _trim_buffer(activity_log, MAX_LOG)
+
+                self.total_detections += 1
+                self.activity_counts[label] += 1
+                if is_productive:
+                    self.productive_detections += 1
+                if recognized:
+                    self.unique_recognized_employee_ids.add(employee_id)
+                self._update_employee_productivity(employee_id, employee_name, is_productive)
+
+                if is_productive:
+                    if not subject.has_seen_productive:
+                        self._append_event(
+                            mode,
+                            "started_working",
+                            f"{employee_name} started working",
+                            employee_id,
+                            employee_name,
+                            severity="warning",
+                            label=label,
+                        )
+                    elif subject.inactivity_alert_active:
+                        self._resolve_alert(f"{subject_key}:inactivity")
+                        self._append_event(
+                            mode,
+                            "resumed_productive_work",
+                            f"{employee_name} resumed productive work",
+                            employee_id,
+                            employee_name,
+                            severity="warning",
+                            label=label,
+                        )
+                    subject.last_productive_at = frame_time
+                    subject.has_seen_productive = True
+                    subject.inactivity_alert_active = False
+                elif recognized:
+                    reference_time = subject.last_productive_at
+                    if reference_time is None:
+                        reference_time = subject.first_seen_at
+                    inactive_for = frame_time - reference_time
+                    if inactive_for >= self.settings.inactivity_threshold:
+                        triggered = self._activate_alert(
+                            alert_key=f"{subject_key}:inactivity",
+                            alert_type="inactivity",
+                            employee_id=employee_id,
+                            employee_name=employee_name,
+                            severity="warning",
+                            message=f"{employee_name} inactive for {int(self.settings.inactivity_threshold)} seconds",
+                            observed_at=frame_time,
+                        )
+                        if triggered:
+                            self._append_event(
+                                mode,
+                                "employee_inactive",
+                                f"{employee_name} became inactive",
+                                employee_id,
+                                employee_name,
+                                severity="warning",
+                                label=label,
+                            )
+                        subject.inactivity_alert_active = True
+                else:
+                    self._resolve_alert(f"{subject_key}:inactivity")
+                    subject.inactivity_alert_active = False
+
+                if label == "taking_a_nap":
+                    if subject.nap_started_at is None:
+                        subject.nap_started_at = frame_time
+                    nap_for = frame_time - subject.nap_started_at
+                    if nap_for >= self.settings.nap_threshold:
+                        display_name = _display_name(employee_name)
+                        triggered = self._activate_alert(
+                            alert_key=f"{subject_key}:nap",
+                            alert_type="nap",
+                            employee_id=employee_id,
+                            employee_name=employee_name,
+                            severity="critical",
+                            message=f"{display_name} sleeping for {int(self.settings.nap_threshold)} seconds",
+                            observed_at=frame_time,
+                        )
+                        if triggered:
+                            self._append_event(
+                                mode,
+                                "nap_alert",
+                                f"Nap alert triggered for {display_name}",
+                                employee_id,
+                                employee_name,
+                                severity="critical",
+                                label=label,
+                            )
+                        subject.nap_alert_active = True
+                else:
+                    subject.nap_started_at = None
+                    self._resolve_alert(f"{subject_key}:nap")
+                    subject.nap_alert_active = False
+
+                if not recognized:
+                    if subject.unknown_started_at is None:
+                        subject.unknown_started_at = frame_time
+                    unknown_for = frame_time - subject.unknown_started_at
+                    if unknown_for >= self.settings.unknown_person_threshold:
+                        triggered = self._activate_alert(
+                            alert_key=f"{subject_key}:unknown_person",
+                            alert_type="unknown_person",
+                            employee_id="unknown",
+                            employee_name="Unknown",
+                            severity="critical",
+                            message="Unknown person detected",
+                            observed_at=frame_time,
+                        )
+                        if triggered:
+                            self._append_event(
+                                mode,
+                                "unknown_person_detected",
+                                "Unknown person detected",
+                                "unknown",
+                                "Unknown",
+                                severity="critical",
+                                label=label,
+                            )
+                        subject.unknown_alert_active = True
+                else:
+                    subject.unknown_started_at = None
+                    self._resolve_alert(f"{subject_key}:unknown_person")
+                    subject.unknown_alert_active = False
+
+                subject.was_productive = is_productive
+
+            previous_subjects = self.subjects_by_source.get(source_id, set())
+            for missing_subject_key in previous_subjects - current_subject_keys:
+                missing_subject = self.subjects.pop(missing_subject_key, None)
+                if missing_subject is not None:
+                    self._clear_subject_alerts(missing_subject_key, missing_subject)
+
+            self.subjects_by_source[source_id] = current_subject_keys
+
+            top_alert = self.get_top_active_alert()
+            return {
+                "active_alert": top_alert,
+                "active_alerts_count": len(self.active_alerts),
+                "active_employees": len(self.subjects),
+            }
+
+    def get_top_active_alert(self) -> Optional[Dict[str, Any]]:
+        active = sorted(
+            self.active_alerts.values(),
+            key=lambda alert: (
+                ALERT_SEVERITY_RANK.get(alert["severity"], 0),
+                alert["timestamp"],
+            ),
+            reverse=True,
+        )
+        return active[0] if active else None
+
+    def list_recent_events(self, limit: int = 500) -> List[Dict[str, Any]]:
+        with self.lock:
+            return event_log[-limit:]
+
+    def list_recent_alerts(self, limit: int = 100) -> List[Dict[str, Any]]:
+        with self.lock:
+            return triggered_alerts[-limit:]
+
+    def list_active_alerts(self) -> List[Dict[str, Any]]:
+        with self.lock:
+            return sorted(
+                self.active_alerts.values(),
+                key=lambda alert: (
+                    ALERT_SEVERITY_RANK.get(alert["severity"], 0),
+                    alert["timestamp"],
+                ),
+                reverse=True,
+            )
+
+    def get_dashboard_summary(self) -> Dict[str, Any]:
+        with self.lock:
+            total_events = self.total_detections
+            productive_events = self.productive_detections
+            productivity_score = round(
+                (productive_events / total_events) * 100, 1
+            ) if total_events else 0.0
+
+            employee_breakdown = []
+            for employee in self.employee_productivity.values():
+                total = employee["total_events"]
+                productive = employee["productive_events"]
+                employee_breakdown.append(
+                    {
+                        **employee,
+                        "productivity_score": round((productive / total) * 100, 1) if total else 0.0,
+                    }
+                )
+
+            employee_breakdown.sort(
+                key=lambda item: (item["productivity_score"], item["productive_events"]),
+                reverse=True,
+            )
+
+            return {
+                "metrics": {
+                    "total_detections": total_events,
+                    "active_employees": len(self.subjects),
+                    "recognized_employees": len(self.unique_recognized_employee_ids),
+                    "productivity_score": productivity_score,
+                    "active_alerts": len(self.active_alerts),
+                    "productive_events": productive_events,
+                    "total_events": total_events,
+                },
+                "activity_distribution": [
+                    {"label": label, "count": count}
+                    for label, count in self.activity_counts.most_common()
+                ],
+                "recent_events": event_log[-10:],
+                "active_alert": self.get_top_active_alert(),
+                "employee_productivity": employee_breakdown[:6],
+            }
+
+
+monitoring_state = MonitoringState()
 
 
 # ── background video processing ──────────────────────────────────────────
@@ -145,6 +619,7 @@ def _process_video(job_id: str, input_path: str):
 
         process_every_n_frames = max(1, round(fps / 10))
         last_annotated_frame = None
+        source_id = f"video:{job_id}"
 
         global frames_processed
         while True:
@@ -159,8 +634,13 @@ def _process_video(job_id: str, input_path: str):
                 recent_inference_times.append(elapsed_ms)
                 frames_processed += 1
                 last_annotated_frame = annotated
+                monitoring_state.record_frame(
+                    source_id=source_id,
+                    mode="Video",
+                    detections=dets,
+                    observed_at=frame_idx / fps,
+                )
                 for d in dets:
-                    _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
                     job_detections.append(d)
 
             if last_annotated_frame is not None:
@@ -182,6 +662,12 @@ def _process_video(job_id: str, input_path: str):
                 )
 
         logger.info("[video:%s] Frame processing complete processed_frames=%s", job_id, frame_idx)
+        monitoring_state.record_frame(
+            source_id=source_id,
+            mode="Video",
+            detections=[],
+            observed_at=frame_idx / fps,
+        )
 
         if cap is not None:
             cap.release()
@@ -398,9 +884,11 @@ async def video_stream(websocket: WebSocket):
             recent_inference_times.append(elapsed_ms)
             frames_processed += 1
 
-            # log detections
-            for d in dets:
-                _append_log("Live", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
+            monitoring_snapshot = monitoring_state.record_frame(
+                source_id="live",
+                mode="Live",
+                detections=dets,
+            )
 
             # encode annotated frame back to base64 JPEG
             _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -413,18 +901,35 @@ async def video_stream(websocket: WebSocket):
                 "boxes": dets,
                 "annotated_frame": b64_frame,
                 "fps": fps_val,
+                "active_alert": monitoring_snapshot["active_alert"],
+                "active_alerts_count": monitoring_snapshot["active_alerts_count"],
             }
             last_processed_time = time.time()
 
             await websocket.send_json(last_result)
     except WebSocketDisconnect:
-        pass
+        monitoring_state.record_frame(
+            source_id="live",
+            mode="Live",
+            detections=[],
+        )
 
 
 # ── Activity log ─────────────────────────────────────────────────────────
 @app.get("/activity-log")
 async def get_activity_log():
-    return activity_log[-500:]
+    with monitoring_state.lock:
+        return list(activity_log[-500:])
+
+
+@app.get("/activity-events")
+async def get_activity_events():
+    return monitoring_state.list_recent_events(limit=500)
+
+
+@app.get("/dashboard-summary")
+async def get_dashboard_summary():
+    return monitoring_state.get_dashboard_summary()
 
 
 # ── Export CSV ───────────────────────────────────────────────────────────
@@ -435,7 +940,9 @@ async def export_csv():
         buf, fieldnames=["timestamp", "mode", "label", "confidence", "employee_id", "employee_name"]
     )
     writer.writeheader()
-    for row in activity_log:
+    with monitoring_state.lock:
+        rows = list(activity_log)
+    for row in rows:
         writer.writerow(row)
     buf.seek(0)
     return StreamingResponse(
@@ -458,10 +965,25 @@ async def get_alert_config():
     return alert_configs
 
 
+@app.get("/alerts/settings")
+async def get_alert_settings():
+    return monitoring_state.get_alert_settings()
+
+
+@app.post("/alerts/settings")
+async def set_alert_settings(payload: Dict[str, Any]):
+    return monitoring_state.update_alert_settings(payload)
+
+
 # ── Alerts ───────────────────────────────────────────────────────────────
 @app.get("/alerts")
 async def get_alerts():
-    return triggered_alerts[-100:]
+    return monitoring_state.list_recent_alerts(limit=100)
+
+
+@app.get("/alerts/active")
+async def get_active_alerts():
+    return monitoring_state.list_active_alerts()
 
 
 # ── Employees ────────────────────────────────────────────────────────────

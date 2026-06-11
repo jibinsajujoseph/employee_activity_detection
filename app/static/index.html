@@ -273,6 +273,12 @@
         border-radius: var(--radius-sm);
         border-left: 3px solid var(--accent);
       }
+      .timeline-item.critical {
+        border-left-color: var(--danger);
+      }
+      .timeline-item.warning {
+        border-left-color: var(--warning);
+      }
       .timeline-item .time {
         font-size: 0.75rem;
         color: var(--text-muted);
@@ -482,6 +488,37 @@
         display: flex;
         gap: 12px;
         margin: 16px 0;
+      }
+      .live-alert-banner {
+        display: none;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 18px;
+        margin-bottom: 16px;
+        background: rgba(239, 68, 68, 0.12);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        border-radius: var(--radius);
+      }
+      .live-alert-banner.warning {
+        background: rgba(245, 158, 11, 0.12);
+        border-color: rgba(245, 158, 11, 0.35);
+      }
+      .live-alert-banner.critical {
+        background: rgba(239, 68, 68, 0.12);
+        border-color: rgba(239, 68, 68, 0.35);
+      }
+      .live-alert-icon {
+        font-size: 1.2rem;
+        line-height: 1.2;
+      }
+      .live-alert-copy strong {
+        display: block;
+        font-size: 0.78rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .live-alert-copy span {
+        color: var(--text);
       }
 
       .activity-chips {
@@ -878,63 +915,63 @@
       /* ─── Alerts ─────────────────────────────────────────────── */
       .alert-config-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 12px;
-        margin-bottom: 28px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
       }
       .alert-config-item {
         display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px 16px;
-        background: var(--surface);
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px 18px;
+        background: var(--surface-alt);
         border: 1px solid var(--border);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius);
       }
       .alert-config-item .label {
-        flex: 1;
-        font-size: 0.85rem;
-        font-weight: 500;
-        text-transform: capitalize;
-      }
-      .toggle {
-        position: relative;
-        width: 42px;
-        height: 22px;
-        background: var(--border);
-        border-radius: 11px;
-        cursor: pointer;
-        transition: background var(--transition);
-      }
-      .toggle.active {
-        background: var(--accent);
-      }
-      .toggle::after {
-        content: "";
-        position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 16px;
-        height: 16px;
-        background: #fff;
-        border-radius: 50%;
-        transition: transform var(--transition);
-      }
-      .toggle.active::after {
-        transform: translateX(20px);
-      }
-      .threshold-slider {
-        width: 70px;
-        accent-color: var(--accent);
-      }
-      .threshold-val {
-        font-size: 0.78rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
         color: var(--text-muted);
-        min-width: 32px;
-        text-align: right;
-        font-variant-numeric: tabular-nums;
       }
-
+      .alert-config-item input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 1rem;
+      }
+      .alert-config-item small {
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+      .alert-toolbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .audio-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: var(--surface-alt);
+        color: var(--text);
+        font-size: 0.84rem;
+        font-weight: 600;
+      }
+      .audio-toggle.active {
+        border-color: rgba(34, 197, 94, 0.45);
+        color: var(--success);
+      }
       .alert-feed {
         display: flex;
         flex-direction: column;
@@ -947,23 +984,58 @@
         border-left: 4px solid var(--danger);
         border-radius: var(--radius-sm);
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 14px;
         animation: slideIn 0.35s ease;
       }
+      .alert-toast.warning {
+        border-left-color: var(--warning);
+      }
+      .alert-toast.critical {
+        border-left-color: var(--danger);
+      }
       .alert-toast .alert-label {
         font-weight: 600;
-        text-transform: capitalize;
         flex: 1;
       }
-      .alert-toast .alert-conf {
-        color: var(--danger);
-        font-weight: 700;
-        font-size: 0.9rem;
+      .alert-toast .alert-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 88px;
       }
       .alert-toast .alert-time {
         font-size: 0.75rem;
         color: var(--text-muted);
+      }
+      .alert-toast .alert-status {
+        font-size: 0.73rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .insight-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .insight-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 14px;
+        background: var(--surface-alt);
+        border-radius: var(--radius-sm);
+      }
+      .insight-row .meta {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .insight-row .meta span:last-child {
+        color: var(--text-muted);
+        font-size: 0.78rem;
       }
       @keyframes slideIn {
         from {
@@ -1216,22 +1288,20 @@
 
         <div class="stat-grid">
           <div class="card stat-card">
-            <span class="label">Detections Today</span>
-            <span class="value" id="stat-detections">0</span>
+            <span class="label">Active Employees</span>
+            <span class="value" id="stat-active-employees">0</span>
           </div>
           <div class="card stat-card">
-            <span class="label">Most Common Activity</span>
-            <span class="value" id="stat-common" style="font-size: 1.2rem"
-              >—</span
-            >
+            <span class="label">Recognized Employees</span>
+            <span class="value" id="stat-recognized">0</span>
           </div>
           <div class="card stat-card">
-            <span class="label">Avg Confidence</span>
-            <span class="value" id="stat-confidence">—</span>
+            <span class="label">Productivity Score</span>
+            <span class="value" id="stat-productivity">0%</span>
           </div>
           <div class="card stat-card">
-            <span class="label">Identified Employees</span>
-            <span class="value" id="stat-identified">0</span>
+            <span class="label">Active Alerts</span>
+            <span class="value" id="stat-active-alerts">0</span>
           </div>
         </div>
 
@@ -1257,6 +1327,17 @@
                 No detections yet.
               </p>
             </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom: 14px; font-size: 0.95rem; font-weight: 600">
+            Employee Productivity Breakdown
+          </h3>
+          <div class="insight-list" id="employee-productivity-list">
+            <p style="color: var(--text-muted); font-size: 0.88rem">
+              No employee activity yet.
+            </p>
           </div>
         </div>
       </section>
@@ -1352,6 +1433,14 @@
       <!-- ── Live Feed ───────────────────────────────────────── -->
       <section class="tab-panel" id="tab-live">
         <h2 class="tab-title">Live Feed</h2>
+
+        <div class="live-alert-banner" id="live-alert-banner">
+          <div class="live-alert-icon">🚨</div>
+          <div class="live-alert-copy">
+            <strong>Active Alert</strong>
+            <span id="live-alert-message">No active alerts</span>
+          </div>
+        </div>
 
         <div class="live-controls">
           <button class="btn btn-primary" id="btn-start-camera">
@@ -1689,8 +1778,8 @@
                 <th data-sort="timestamp">Timestamp ↕</th>
                 <th data-sort="mode">Mode ↕</th>
                 <th data-sort="employee_name">Employee ↕</th>
-                <th data-sort="label">Activity ↕</th>
-                <th data-sort="confidence">Confidence ↕</th>
+                <th data-sort="event_type">Event ↕</th>
+                <th data-sort="severity">Severity ↕</th>
               </tr>
             </thead>
             <tbody id="log-tbody"></tbody>
@@ -1706,9 +1795,58 @@
 
       <!-- ── Alerts ──────────────────────────────────────────── -->
       <section class="tab-panel" id="tab-alerts">
-        <h2 class="tab-title">Alerts Configuration</h2>
+        <h2 class="tab-title">Alerts</h2>
 
-        <div class="alert-config-grid" id="alert-config-grid"></div>
+        <div class="card" style="margin-bottom: 24px">
+          <div class="alert-toolbar">
+            <div>
+              <h3 style="margin-bottom: 4px; font-weight: 600">
+                Business Alert Thresholds
+              </h3>
+              <p class="field-hint">
+                Configure alert timing in seconds to align with your operational policies.
+              </p>
+            </div>
+            <button class="audio-toggle" id="audio-toggle" type="button">
+              🔇 Audio Muted
+            </button>
+          </div>
+          <div class="alert-config-grid" id="alert-config-grid">
+            <div class="alert-config-item">
+              <span class="label">Inactivity Threshold (Seconds)</span>
+              <input
+                type="number"
+                id="threshold-inactivity"
+                min="1"
+                step="1"
+                value="10"
+              />
+              <small>Triggers when a recognized employee is not productive.</small>
+            </div>
+            <div class="alert-config-item">
+              <span class="label">Nap Threshold (Seconds)</span>
+              <input
+                type="number"
+                id="threshold-nap"
+                min="1"
+                step="1"
+                value="5"
+              />
+              <small>Triggers when sleeping is detected continuously.</small>
+            </div>
+            <div class="alert-config-item">
+              <span class="label">Unknown Person Threshold (Seconds)</span>
+              <input
+                type="number"
+                id="threshold-unknown"
+                min="1"
+                step="1"
+                value="3"
+              />
+              <small>Triggers when an unknown face stays in view.</small>
+            </div>
+          </div>
+        </div>
 
         <h3 style="margin-bottom: 14px; font-weight: 600">Alert Feed</h3>
         <div class="alert-feed" id="alert-feed">
@@ -1867,6 +2005,7 @@
         // ── State ───────────────────────────────────────────────────────
         let sessionStart = Date.now();
         let activityLog = [];
+        let dashboardSummary = null;
         let logPage = 1;
         const LOG_PER_PAGE = 20;
         let logSort = { key: "timestamp", asc: false };
@@ -1880,7 +2019,10 @@
         let reconnectTimeout = null;
         const MAX_WS_RETRIES = 3;
         let doughnutChart = null;
-        let lastAlertCount = 0;
+        let seenAlertIds = new Set();
+        let spokenAlertIds = new Set();
+        let pendingAlertQueue = [];
+        let audioMuted = true;
 
         // ── Toast ───────────────────────────────────────────────────────
         function showToast(msg, type = "info") {
@@ -1954,45 +2096,47 @@
         });
 
         // ═══════════════ DASHBOARD ═════════════════════════════════════
-        function updateDashboard() {
-          const log = activityLog;
-          document.getElementById("stat-detections").textContent = log.length;
-
-          if (log.length > 0) {
-            // most common
-            const counts = {};
-            let totalConf = 0;
-            const uniqueEmployees = new Set();
-            log.forEach((e) => {
-              counts[e.label] = (counts[e.label] || 0) + 1;
-              totalConf += e.confidence;
-              if (e.employee_name && e.employee_name !== "Unknown") {
-                uniqueEmployees.add(e.employee_name);
-              }
-            });
-            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-            const topLabel = sorted[0][0].replace(/_/g, " ");
-            document.getElementById("stat-common").textContent = topLabel;
-            document.getElementById("stat-confidence").textContent =
-              ((totalConf / log.length) * 100).toFixed(1) + "%";
-            document.getElementById("stat-identified").textContent =
-              uniqueEmployees.size;
-
-            // doughnut chart
-            updateDoughnut(counts);
-
-            // timeline
-            updateTimeline(log.slice(-10).reverse());
-          }
+        function formatLabel(value) {
+          return String(value || "—").replace(/_/g, " ");
         }
 
-        function updateDoughnut(counts) {
-          const labels = CLASSES.filter((c) => counts[c]);
-          const data = labels.map((c) => counts[c] || 0);
-          const colours = labels.map((c) => CLASS_COLOURS[CLASSES.indexOf(c)]);
+        function escapeHtml(value) {
+          return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+
+        function updateDashboard(summary) {
+          dashboardSummary = summary;
+          const metrics = summary?.metrics || {};
+          document.getElementById("stat-active-employees").textContent =
+            metrics.active_employees ?? 0;
+          document.getElementById("stat-recognized").textContent =
+            metrics.recognized_employees ?? 0;
+          document.getElementById("stat-productivity").textContent =
+            `${(metrics.productivity_score ?? 0).toFixed(1)}%`;
+          document.getElementById("stat-active-alerts").textContent =
+            metrics.active_alerts ?? 0;
+
+          updateDoughnut(summary?.activity_distribution || []);
+          updateTimeline(summary?.recent_events || []);
+          renderEmployeeProductivity(summary?.employee_productivity || []);
+          updateLiveAlertBanner(summary?.active_alert || null);
+        }
+
+        function updateDoughnut(distribution) {
+          const labels = distribution.map((item) => item.label);
+          const data = distribution.map((item) => item.count);
+          const colours = labels.map((label) => {
+            const classIndex = CLASSES.indexOf(label);
+            return classIndex >= 0 ? CLASS_COLOURS[classIndex] : "#6c63ff";
+          });
 
           if (doughnutChart) {
-            doughnutChart.data.labels = labels.map((l) => l.replace(/_/g, " "));
+            doughnutChart.data.labels = labels.map((l) => formatLabel(l));
             doughnutChart.data.datasets[0].data = data;
             doughnutChart.data.datasets[0].backgroundColor = colours;
             doughnutChart.update();
@@ -2003,7 +2147,7 @@
             doughnutChart = new Chart(ctx, {
               type: "doughnut",
               data: {
-                labels: labels.map((l) => l.replace(/_/g, " ")),
+                labels: labels.map((l) => formatLabel(l)),
                 datasets: [
                   {
                     data,
@@ -2036,8 +2180,14 @@
 
         function updateTimeline(items) {
           const el = document.getElementById("timeline-list");
-          if (!items.length) return;
+          if (!items.length) {
+            el.innerHTML =
+              '<p style="color: var(--text-muted); font-size: 0.88rem">No events yet.</p>';
+            return;
+          }
           el.innerHTML = items
+            .slice()
+            .reverse()
             .map((e) => {
               const t = new Date(e.timestamp);
               const time = t.toLocaleTimeString([], {
@@ -2045,29 +2195,51 @@
                 minute: "2-digit",
                 second: "2-digit",
               });
-              const conf = (e.confidence * 100).toFixed(0);
-              const badgeClass =
-                conf >= 70
-                  ? "badge-green"
-                  : conf >= 40
-                    ? "badge-amber"
-                    : "badge-red";
-              const barColour =
-                conf >= 70
-                  ? "var(--success)"
-                  : conf >= 40
-                    ? "var(--warning)"
-                    : "var(--danger)";
               return `
-        <div class="timeline-item">
+        <div class="timeline-item ${e.severity || "warning"}">
           <span class="time">${time}</span>
-          <span class="badge ${badgeClass}">${e.label.replace(/_/g, " ")}</span>
-          <div class="conf-bar"><div class="conf-bar-fill" style="width:${conf}%;background:${barColour}"></div></div>
-          <span style="font-size:0.78rem;color:var(--text-muted);min-width:32px">${conf}%</span>
+          <span class="badge ${e.severity === "critical" ? "badge-red" : "badge-amber"}">${formatLabel(e.event_type)}</span>
+          <span style="font-size:0.82rem;color:var(--text);">${escapeHtml(e.message)}</span>
         </div>
       `;
             })
             .join("");
+        }
+
+        function renderEmployeeProductivity(items) {
+          const container = document.getElementById("employee-productivity-list");
+          if (!items.length) {
+            container.innerHTML =
+              '<p style="color: var(--text-muted); font-size: 0.88rem">No employee activity yet.</p>';
+            return;
+          }
+          container.innerHTML = items
+            .map(
+              (item) => `
+        <div class="insight-row">
+          <div class="meta">
+            <span>${escapeHtml(item.employee_name)}</span>
+            <span>${item.productive_events} productive events · ${item.total_events} total</span>
+          </div>
+          <strong>${item.productivity_score.toFixed(1)}%</strong>
+        </div>
+      `,
+            )
+            .join("");
+        }
+
+        function updateLiveAlertBanner(alert) {
+          const banner = document.getElementById("live-alert-banner");
+          const message = document.getElementById("live-alert-message");
+          banner.classList.remove("warning", "critical");
+          if (!alert) {
+            banner.style.display = "none";
+            message.textContent = "No active alerts";
+            return;
+          }
+          banner.style.display = "flex";
+          banner.classList.add(alert.severity || "warning");
+          message.textContent = alert.message || "Active alert";
         }
 
         // ═══════════════ UPLOAD VIDEO ══════════════════════════════════
@@ -2275,6 +2447,7 @@
             // fps
             document.getElementById("fps-counter").textContent =
               data.fps + " FPS";
+            updateLiveAlertBanner(data.active_alert || null);
 
             // update chips
             const detected = new Set(
@@ -2378,6 +2551,7 @@
             liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
           }
           document.getElementById("fps-counter").textContent = "0 FPS";
+          updateLiveAlertBanner(null);
           btnStart.disabled = false;
           btnStop.disabled = true;
           document
@@ -2419,8 +2593,9 @@
           if (logSearch) {
             data = data.filter(
               (e) =>
-                e.label.toLowerCase().includes(logSearch) ||
+                (e.message || "").toLowerCase().includes(logSearch) ||
                 e.mode.toLowerCase().includes(logSearch) ||
+                (e.event_type || "").toLowerCase().includes(logSearch) ||
                 (e.employee_name &&
                   e.employee_name.toLowerCase().includes(logSearch)),
             );
@@ -2444,13 +2619,6 @@
           const tbody = document.getElementById("log-tbody");
           tbody.innerHTML = page
             .map((e) => {
-              const conf = (e.confidence * 100).toFixed(1);
-              const colour =
-                conf >= 70
-                  ? "var(--success)"
-                  : conf >= 40
-                    ? "var(--warning)"
-                    : "var(--danger)";
               const t = new Date(e.timestamp);
               const ts = t.toLocaleString();
               return `
@@ -2458,13 +2626,8 @@
           <td>${ts}</td>
           <td><span class="badge ${e.mode === "Live" ? "badge-purple" : "badge-green"}">${e.mode}</span></td>
           <td style="color:${e.employee_name !== "Unknown" ? "var(--text)" : "var(--text-muted)"}">${e.employee_name === "Unknown" ? "—" : e.employee_name}</td>
-          <td style="text-transform:capitalize">${e.label.replace(/_/g, " ")}</td>
-          <td>
-            <div class="inline-conf">
-              <div class="inline-conf-bar"><div class="inline-conf-fill" style="width:${conf}%;background:${colour}"></div></div>
-              <span class="inline-conf-val" style="color:${colour}">${conf}%</span>
-            </div>
-          </td>
+          <td>${escapeHtml(e.message || formatLabel(e.event_type))}</td>
+          <td><span class="badge ${e.severity === "critical" ? "badge-red" : "badge-amber"}">${e.severity || "warning"}</span></td>
         </tr>
       `;
             })
@@ -2477,56 +2640,90 @@
         }
 
         // ═══════════════ ALERTS ════════════════════════════════════════
-        function buildAlertConfig() {
-          const grid = document.getElementById("alert-config-grid");
-          grid.innerHTML = CLASSES.map(
-            (cls, i) => `
-      <div class="alert-config-item">
-        <div class="toggle" data-cls="${cls}" id="toggle-${cls}"></div>
-        <span class="label">${cls.replace(/_/g, " ")}</span>
-        <input type="range" class="threshold-slider" min="0" max="100" value="70"
-               data-cls="${cls}" id="slider-${cls}" />
-        <span class="threshold-val" id="val-${cls}">70%</span>
-      </div>
-    `,
-          ).join("");
-
-          // wire toggles
-          grid.querySelectorAll(".toggle").forEach((tog) => {
-            tog.addEventListener("click", () => {
-              tog.classList.toggle("active");
-              saveAlertConfig();
-            });
-          });
-
-          // wire sliders
-          grid.querySelectorAll(".threshold-slider").forEach((slider) => {
-            slider.addEventListener("input", () => {
-              document.getElementById(`val-${slider.dataset.cls}`).textContent =
-                slider.value + "%";
-            });
-            slider.addEventListener("change", saveAlertConfig);
-          });
+        function updateAudioToggle() {
+          const button = document.getElementById("audio-toggle");
+          button.classList.toggle("active", !audioMuted);
+          button.textContent = audioMuted ? "🔇 Audio Muted" : "🔊 Audio On";
         }
 
-        async function saveAlertConfig() {
-          const configs = CLASSES.map((cls) => {
-            const toggle = document.getElementById(`toggle-${cls}`);
-            const slider = document.getElementById(`slider-${cls}`);
-            return {
-              label: cls,
-              enabled: toggle.classList.contains("active"),
-              threshold: parseInt(slider.value) / 100,
-            };
+        function speakNextPendingAlert() {
+          if (
+            audioMuted ||
+            !("speechSynthesis" in window) ||
+            !pendingAlertQueue.length ||
+            window.speechSynthesis.speaking
+          ) {
+            return;
+          }
+          const nextAlert = pendingAlertQueue.shift();
+          const utterance = new SpeechSynthesisUtterance(
+            `Alert. ${nextAlert.message}.`,
+          );
+          utterance.rate = 1;
+          utterance.pitch = 1;
+          utterance.onend = () => {
+            spokenAlertIds.add(nextAlert.id);
+            speakNextPendingAlert();
+          };
+          utterance.onerror = () => {
+            speakNextPendingAlert();
+          };
+          window.speechSynthesis.speak(utterance);
+        }
+
+        function queueAlertForSpeech(alert) {
+          if (
+            !alert?.id ||
+            !alert?.message ||
+            spokenAlertIds.has(alert.id) ||
+            pendingAlertQueue.some((item) => item.id === alert.id)
+          ) {
+            return;
+          }
+          pendingAlertQueue.push({
+            id: alert.id,
+            message: alert.message,
           });
+          speakNextPendingAlert();
+        }
+
+        async function loadAlertSettings() {
           try {
-            await apiFetch("/alerts/config", {
+            const r = await apiFetch("/alerts/settings");
+            const settings = await r.json();
+            document.getElementById("threshold-inactivity").value =
+              settings.inactivity_threshold ?? 10;
+            document.getElementById("threshold-nap").value =
+              settings.nap_threshold ?? 5;
+            document.getElementById("threshold-unknown").value =
+              settings.unknown_person_threshold ?? 3;
+          } catch {
+            /* toast shown by apiFetch */
+          }
+        }
+
+        async function saveAlertSettings() {
+          try {
+            await apiFetch("/alerts/settings", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(configs),
+              body: JSON.stringify({
+                inactivity_threshold: parseInt(
+                  document.getElementById("threshold-inactivity").value || "10",
+                  10,
+                ),
+                nap_threshold: parseInt(
+                  document.getElementById("threshold-nap").value || "5",
+                  10,
+                ),
+                unknown_person_threshold: parseInt(
+                  document.getElementById("threshold-unknown").value || "3",
+                  10,
+                ),
+              }),
             });
           } catch {
-            /* toast shown */
+            /* toast shown by apiFetch */
           }
         }
 
@@ -2534,10 +2731,15 @@
           try {
             const r = await fetch("/alerts");
             const data = await r.json();
-            if (data.length > lastAlertCount) {
-              renderAlerts(data);
-              lastAlertCount = data.length;
-            }
+            renderAlerts(data);
+            data.forEach((alert) => {
+              if (!seenAlertIds.has(alert.id)) {
+                seenAlertIds.add(alert.id);
+                if (!audioMuted) {
+                  queueAlertForSpeech(alert);
+                }
+              }
+            });
           } catch {
             /* silent */
           }
@@ -2545,23 +2747,55 @@
 
         function renderAlerts(alerts) {
           const feed = document.getElementById("alert-feed");
+          if (!alerts.length) {
+            feed.innerHTML =
+              '<p style="color: var(--text-muted); font-size: 0.88rem">No alerts triggered yet.</p>';
+            return;
+          }
           feed.innerHTML = alerts
-            .slice(-30)
+            .slice()
             .reverse()
             .map((a) => {
               const t = new Date(a.timestamp);
               return `
-        <div class="alert-toast">
-          <span class="alert-label">${a.label.replace(/_/g, " ")}</span>
-          <span class="alert-conf">${(a.confidence * 100).toFixed(0)}%</span>
-          <span class="alert-time">${t.toLocaleTimeString()}</span>
+        <div class="alert-toast ${a.severity || "warning"}">
+          <span style="font-size:1.1rem">🚨</span>
+          <span class="alert-label">${escapeHtml(a.message)}</span>
+          <div class="alert-meta">
+            <span class="alert-status">${a.active ? "Active" : "Recent"}</span>
+            <span class="alert-time">${t.toLocaleTimeString()}</span>
+          </div>
         </div>
       `;
             })
             .join("");
         }
 
-        buildAlertConfig();
+        document
+          .getElementById("audio-toggle")
+          .addEventListener("click", () => {
+            audioMuted = !audioMuted;
+            updateAudioToggle();
+            if (audioMuted && "speechSynthesis" in window) {
+              window.speechSynthesis.cancel();
+            } else if (!audioMuted) {
+              fetchAlerts().then(() => {
+                speakNextPendingAlert();
+              });
+            }
+          });
+
+        [
+          "threshold-inactivity",
+          "threshold-nap",
+          "threshold-unknown",
+        ].forEach((id) => {
+          document
+            .getElementById(id)
+            .addEventListener("change", saveAlertSettings);
+        });
+
+        updateAudioToggle();
 
         // ═══════════════ EMPLOYEES ═════════════════════════════════════
         const enrollDropZone = document.getElementById("enroll-drop-zone");
@@ -3162,37 +3396,51 @@
             }
           });
 
-        function updateExportSummary() {
+        function updateExportSummary(summary) {
+          const metrics = summary?.metrics || {};
           document.getElementById("export-total").textContent =
-            activityLog.length;
+            metrics.total_detections ?? 0;
           const dur = Math.floor((Date.now() - sessionStart) / 1000);
           const m = Math.floor(dur / 60);
           const s = dur % 60;
           document.getElementById("export-duration").textContent =
             `${m}m ${s}s`;
-          // most active — find the hour with most detections
-          if (activityLog.length > 0) {
+          const recentEvents = summary?.recent_events || [];
+          if (recentEvents.length) {
             const hourCounts = {};
-            activityLog.forEach((e) => {
+            recentEvents.forEach((e) => {
               const h = new Date(e.timestamp).getHours();
               hourCounts[h] = (hourCounts[h] || 0) + 1;
             });
             const topHour = Object.entries(hourCounts).sort(
               (a, b) => b[1] - a[1],
-            )[0][0];
+            )[0]?.[0];
             document.getElementById("export-active").textContent =
-              `${topHour}:00 – ${(parseInt(topHour) + 1) % 24}:00`;
+              topHour == null
+                ? "—"
+                : `${topHour}:00 – ${(parseInt(topHour, 10) + 1) % 24}:00`;
+          } else {
+            document.getElementById("export-active").textContent = "—";
           }
         }
 
         // ═══════════════ POLLING LOOP ══════════════════════════════════
-        async function fetchLog() {
+        async function fetchEventLog() {
           try {
-            const r = await fetch("/activity-log");
+            const r = await fetch("/activity-events");
             activityLog = await r.json();
             renderLog();
-            updateDashboard();
-            updateExportSummary();
+          } catch {
+            /* silent */
+          }
+        }
+
+        async function fetchDashboardSummary() {
+          try {
+            const r = await fetch("/dashboard-summary");
+            const data = await r.json();
+            updateDashboard(data);
+            updateExportSummary(data);
           } catch {
             /* silent */
           }
@@ -3209,14 +3457,18 @@
           }
         }
 
-        setInterval(fetchLog, 5000);
+        setInterval(fetchEventLog, 5000);
+        setInterval(fetchDashboardSummary, 5000);
         setInterval(fetchAlerts, 5000);
         setInterval(fetchEmployees, 30000);
         setInterval(fetchPerfStats, 10000);
-        fetchLog();
+        fetchEventLog();
+        fetchDashboardSummary();
+        loadAlertSettings();
         resetEnrollmentForm();
         setEnrollmentMode("upload");
         fetchEmployees();
+        fetchAlerts();
         fetchPerfStats();
 
         window.addEventListener("beforeunload", stopEnrollCamera);
