@@ -524,6 +524,37 @@ async def get_employees():
     fr = get_face_recognizer()
     return fr.get_all_employees()
 
+@app.post("/employees/validate-photos")
+async def validate_employee_photos(photos: List[UploadFile] = File(...)):
+    fr = get_face_recognizer()
+    results = []
+
+    for photo in photos:
+        content = await photo.read()
+        nparr = np.frombuffer(content, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            results.append(
+                {
+                    "filename": photo.filename or "image",
+                    "valid_image": False,
+                    "face_detected": False,
+                    "face_count": 0,
+                }
+            )
+            continue
+
+        inspection = fr.inspect_image(img)
+        results.append(
+            {
+                "filename": photo.filename or "image",
+                "valid_image": True,
+                **inspection,
+            }
+        )
+
+    return {"results": results}
+
 @app.get("/employees/{employee_id}")
 async def get_employee(employee_id: str):
     fr = get_face_recognizer()

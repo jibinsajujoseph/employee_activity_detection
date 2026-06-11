@@ -1,1078 +1,2064 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="ActivityWatch — Real-time employee activity detection powered by YOLOv8 and EfficientNet-B0. Monitor, analyse, and export workplace activity data." />
-  <title>ActivityWatch — Employee Activity Detection</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    /* ─── Reset & Tokens ─────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:          #0f1117;
-      --surface:     #1e2130;
-      --surface-alt: #262a3a;
-      --border:      #2e3348;
-      --text:        #e4e6f0;
-      --text-muted:  #8b8fa3;
-      --accent:      #6c63ff;
-      --accent-glow: rgba(108, 99, 255, 0.35);
-      --success:     #22c55e;
-      --warning:     #f59e0b;
-      --danger:      #ef4444;
-      --radius:      12px;
-      --radius-sm:   8px;
-      --shadow:      0 4px 24px rgba(0,0,0,0.35);
-      --transition:  0.25s cubic-bezier(.4,0,.2,1);
-      --font:        'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    html { font-size: 15px; }
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.6;
-      min-height: 100vh;
-      display: flex;
-      overflow-x: hidden;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    button { font-family: var(--font); cursor: pointer; }
-    input, select { font-family: var(--font); }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="ActivityWatch — Real-time employee activity detection powered by YOLOv8 and EfficientNet-B0. Monitor, analyse, and export workplace activity data."
+    />
+    <title>ActivityWatch — Employee Activity Detection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      /* ─── Reset & Tokens ─────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0f1117;
+        --surface: #1e2130;
+        --surface-alt: #262a3a;
+        --border: #2e3348;
+        --text: #e4e6f0;
+        --text-muted: #8b8fa3;
+        --accent: #6c63ff;
+        --accent-glow: rgba(108, 99, 255, 0.35);
+        --success: #22c55e;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+        --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        --font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      html {
+        font-size: 15px;
+      }
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        overflow-x: hidden;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      button {
+        font-family: var(--font);
+        cursor: pointer;
+      }
+      input,
+      select {
+        font-family: var(--font);
+      }
 
-    /* ─── Scrollbar ──────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+      /* ─── Scrollbar ──────────────────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
 
-    /* ─── Sidebar ────────────────────────────────────────────── */
-    #sidebar {
-      width: 240px;
-      min-width: 240px;
-      background: var(--surface);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      padding: 24px 16px 16px;
-      position: fixed;
-      top: 0; left: 0; bottom: 0;
-      z-index: 100;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 36px;
-      padding: 0 4px;
-    }
-    .logo svg { flex-shrink: 0; }
-    .logo h1 {
-      font-size: 1.25rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      letter-spacing: -0.3px;
-    }
-    .nav-links { list-style: none; flex: 1; }
-    .nav-links li { margin-bottom: 4px; }
-    .nav-links a {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      color: var(--text-muted);
-      font-weight: 500;
-      font-size: 0.9rem;
-      transition: all var(--transition);
-    }
-    .nav-links a:hover { color: var(--text); background: var(--surface-alt); }
-    .nav-links a.active {
-      color: #fff;
-      background: linear-gradient(135deg, rgba(108,99,255,0.18), rgba(108,99,255,0.08));
-      box-shadow: inset 3px 0 0 var(--accent);
-    }
-    .nav-links a svg { width: 18px; height: 18px; opacity: 0.7; }
-    .nav-links a.active svg { opacity: 1; }
+      /* ─── Sidebar ────────────────────────────────────────────── */
+      #sidebar {
+        width: 240px;
+        min-width: 240px;
+        background: var(--surface);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        padding: 24px 16px 16px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        z-index: 100;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 36px;
+        padding: 0 4px;
+      }
+      .logo svg {
+        flex-shrink: 0;
+      }
+      .logo h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--accent), #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: -0.3px;
+      }
+      .nav-links {
+        list-style: none;
+        flex: 1;
+      }
+      .nav-links li {
+        margin-bottom: 4px;
+      }
+      .nav-links a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all var(--transition);
+      }
+      .nav-links a:hover {
+        color: var(--text);
+        background: var(--surface-alt);
+      }
+      .nav-links a.active {
+        color: #fff;
+        background: linear-gradient(
+          135deg,
+          rgba(108, 99, 255, 0.18),
+          rgba(108, 99, 255, 0.08)
+        );
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .nav-links a svg {
+        width: 18px;
+        height: 18px;
+        opacity: 0.7;
+      }
+      .nav-links a.active svg {
+        opacity: 1;
+      }
 
-    .sidebar-footer {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-    }
-    .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--danger);
-      transition: background var(--transition);
-    }
-    .status-dot.connected { background: var(--success); box-shadow: 0 0 6px var(--success); }
+      .sidebar-footer {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border-top: 1px solid var(--border);
+        font-size: 0.78rem;
+        color: var(--text-muted);
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--danger);
+        transition: background var(--transition);
+      }
+      .status-dot.connected {
+        background: var(--success);
+        box-shadow: 0 0 6px var(--success);
+      }
 
-    /* ─── Main Content ───────────────────────────────────────── */
-    #main {
-      flex: 1;
-      margin-left: 240px;
-      padding: 28px 32px 40px;
-      min-height: 100vh;
-    }
+      /* ─── Main Content ───────────────────────────────────────── */
+      #main {
+        flex: 1;
+        margin-left: 240px;
+        padding: 28px 32px 40px;
+        min-height: 100vh;
+      }
 
-    /* ─── Tab Panels ─────────────────────────────────────────── */
-    .tab-panel {
-      display: none;
-      opacity: 0;
-      transform: translateY(12px);
-      transition: opacity 0.35s ease, transform 0.35s ease;
-    }
-    .tab-panel.active {
-      display: block;
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .tab-title {
-      font-size: 1.55rem;
-      font-weight: 700;
-      margin-bottom: 24px;
-      letter-spacing: -0.4px;
-    }
+      /* ─── Tab Panels ─────────────────────────────────────────── */
+      .tab-panel {
+        display: none;
+        opacity: 0;
+        transform: translateY(12px);
+        transition:
+          opacity 0.35s ease,
+          transform 0.35s ease;
+      }
+      .tab-panel.active {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .tab-title {
+        font-size: 1.55rem;
+        font-weight: 700;
+        margin-bottom: 24px;
+        letter-spacing: -0.4px;
+      }
 
-    /* ─── Cards ──────────────────────────────────────────────── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 24px;
-      box-shadow: var(--shadow);
-      transition: transform var(--transition), box-shadow var(--transition);
-    }
-    .card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
+      /* ─── Cards ──────────────────────────────────────────────── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px 24px;
+        box-shadow: var(--shadow);
+        transition:
+          transform var(--transition),
+          box-shadow var(--transition);
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+      }
 
-    /* ─── Stat Cards ─────────────────────────────────────────── */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 18px;
-      margin-bottom: 28px;
-    }
-    .stat-card {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .stat-card .label {
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-    .stat-card .value {
-      font-size: 1.9rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, var(--accent), #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+      /* ─── Stat Cards ─────────────────────────────────────────── */
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 28px;
+      }
+      .stat-card {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .stat-card .label {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .stat-card .value {
+        font-size: 1.9rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--accent), #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
 
-    /* ─── Charts ─────────────────────────────────────────────── */
-    .charts-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 24px;
-    }
-    .chart-container { position: relative; height: 320px; }
+      /* ─── Charts ─────────────────────────────────────────────── */
+      .charts-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+      .chart-container {
+        position: relative;
+        height: 320px;
+      }
 
-    /* ─── Timeline ───────────────────────────────────────────── */
-    .timeline {
-      max-height: 420px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .timeline-item {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 12px 16px;
-      background: var(--surface-alt);
-      border-radius: var(--radius-sm);
-      border-left: 3px solid var(--accent);
-    }
-    .timeline-item .time {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      min-width: 65px;
-      font-variant-numeric: tabular-nums;
-    }
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-    }
-    .badge-purple { background: rgba(108,99,255,0.18); color: #a78bfa; }
-    .badge-green  { background: rgba(34,197,94,0.15);  color: var(--success); }
-    .badge-amber  { background: rgba(245,158,11,0.15); color: var(--warning); }
-    .badge-red    { background: rgba(239,68,68,0.15);  color: var(--danger); }
+      /* ─── Timeline ───────────────────────────────────────────── */
+      .timeline {
+        max-height: 420px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .timeline-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+        background: var(--surface-alt);
+        border-radius: var(--radius-sm);
+        border-left: 3px solid var(--accent);
+      }
+      .timeline-item .time {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        min-width: 65px;
+        font-variant-numeric: tabular-nums;
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+      }
+      .badge-purple {
+        background: rgba(108, 99, 255, 0.18);
+        color: #a78bfa;
+      }
+      .badge-green {
+        background: rgba(34, 197, 94, 0.15);
+        color: var(--success);
+      }
+      .badge-amber {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+      }
+      .badge-red {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+      }
 
-    .conf-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .conf-bar-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.4s ease;
-    }
+      .conf-bar {
+        flex: 1;
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .conf-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.4s ease;
+      }
 
-    /* ─── Upload Zone ────────────────────────────────────────── */
-    .drop-zone {
-      border: 2px dashed var(--border);
-      border-radius: var(--radius);
-      padding: 56px 32px;
-      text-align: center;
-      cursor: pointer;
-      transition: all var(--transition);
-      background: var(--surface);
-    }
-    .drop-zone:hover, .drop-zone.dragover {
-      border-color: var(--accent);
-      background: rgba(108,99,255,0.06);
-    }
-    .drop-zone svg { margin-bottom: 12px; opacity: 0.5; }
-    .drop-zone p { color: var(--text-muted); font-size: 0.9rem; }
-    .drop-zone .filename { color: var(--accent); font-weight: 600; margin-top: 8px; }
+      /* ─── Upload Zone ────────────────────────────────────────── */
+      .drop-zone {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 56px 32px;
+        text-align: center;
+        cursor: pointer;
+        transition: all var(--transition);
+        background: var(--surface);
+      }
+      .drop-zone:hover,
+      .drop-zone.dragover {
+        border-color: var(--accent);
+        background: rgba(108, 99, 255, 0.06);
+      }
+      .drop-zone svg {
+        margin-bottom: 12px;
+        opacity: 0.5;
+      }
+      .drop-zone p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+      }
+      .drop-zone .filename {
+        color: var(--accent);
+        font-weight: 600;
+        margin-top: 8px;
+      }
 
-    /* ─── Progress Bar ───────────────────────────────────────── */
-    .progress-container { margin: 20px 0; display: none; }
-    .progress-bar-outer {
-      width: 100%;
-      height: 10px;
-      background: var(--border);
-      border-radius: 5px;
-      overflow: hidden;
-    }
-    .progress-bar-inner {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), #a78bfa);
-      border-radius: 5px;
-      transition: width 0.3s ease;
-      width: 0%;
-    }
-    .progress-text {
-      margin-top: 8px;
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      font-variant-numeric: tabular-nums;
-    }
+      /* ─── Progress Bar ───────────────────────────────────────── */
+      .progress-container {
+        margin: 20px 0;
+        display: none;
+      }
+      .progress-bar-outer {
+        width: 100%;
+        height: 10px;
+        background: var(--border);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .progress-bar-inner {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), #a78bfa);
+        border-radius: 5px;
+        transition: width 0.3s ease;
+        width: 0%;
+      }
+      .progress-text {
+        margin-top: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+      }
 
-    /* ─── Buttons ────────────────────────────────────────────── */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 22px;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-weight: 600;
-      font-size: 0.88rem;
-      transition: all var(--transition);
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent), #8b5cf6);
-      color: #fff;
-      box-shadow: 0 4px 14px var(--accent-glow);
-    }
-    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-glow); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-    .btn-secondary {
-      background: var(--surface-alt);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-secondary:hover { border-color: var(--accent); }
-    .btn-danger {
-      background: rgba(239,68,68,0.15);
-      color: var(--danger);
-    }
-    .btn-danger:hover { background: rgba(239,68,68,0.25); }
+      /* ─── Buttons ────────────────────────────────────────────── */
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 22px;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        font-size: 0.88rem;
+        transition: all var(--transition);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), #8b5cf6);
+        color: #fff;
+        box-shadow: 0 4px 14px var(--accent-glow);
+      }
+      .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px var(--accent-glow);
+      }
+      .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-secondary {
+        background: var(--surface-alt);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-secondary:hover {
+        border-color: var(--accent);
+      }
+      .btn-danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+      }
+      .btn-danger:hover {
+        background: rgba(239, 68, 68, 0.25);
+      }
 
-    /* ─── Video Player ───────────────────────────────────────── */
-    .video-result { margin-top: 24px; display: none; }
-    .video-result video {
-      width: 100%;
-      max-width: 800px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-    }
+      /* ─── Video Player ───────────────────────────────────────── */
+      .video-result {
+        margin-top: 24px;
+        display: none;
+      }
+      .video-result video {
+        width: 100%;
+        max-width: 800px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
 
-    /* ─── Summary Table ──────────────────────────────────────── */
-    .summary-table { margin-top: 20px; width: 100%; max-width: 800px; }
-    .summary-table table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .summary-table th, .summary-table td {
-      padding: 10px 16px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.88rem;
-    }
-    .summary-table th {
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-size: 0.72rem;
-      letter-spacing: 1px;
-      font-weight: 600;
-    }
+      /* ─── Summary Table ──────────────────────────────────────── */
+      .summary-table {
+        margin-top: 20px;
+        width: 100%;
+        max-width: 800px;
+      }
+      .summary-table table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .summary-table th,
+      .summary-table td {
+        padding: 10px 16px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.88rem;
+      }
+      .summary-table th {
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 1px;
+        font-weight: 600;
+      }
 
-    /* ─── Live Feed ──────────────────────────────────────────── */
-    .live-container { position: relative; display: inline-block; }
-    .live-canvas {
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      background: #000;
-      max-width: 100%;
-      height: auto;
-    }
-    .fps-counter {
-      position: absolute;
-      top: 12px; right: 14px;
-      background: rgba(0,0,0,0.7);
-      color: var(--success);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.78rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      backdrop-filter: blur(4px);
-    }
-    .live-controls { display: flex; gap: 12px; margin: 16px 0; }
+      /* ─── Live Feed ──────────────────────────────────────────── */
+      .live-container {
+        position: relative;
+        display: inline-block;
+      }
+      .live-canvas {
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: #000;
+        max-width: 100%;
+        height: auto;
+      }
+      .fps-counter {
+        position: absolute;
+        top: 12px;
+        right: 14px;
+        background: rgba(0, 0, 0, 0.7);
+        color: var(--success);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        backdrop-filter: blur(4px);
+      }
+      .live-controls {
+        display: flex;
+        gap: 12px;
+        margin: 16px 0;
+      }
 
-    .activity-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .chip {
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      background: var(--surface-alt);
-      border: 2px solid var(--border);
-      color: var(--text-muted);
-      transition: all 0.3s ease;
-      text-transform: capitalize;
-    }
-    .chip.active {
-      border-color: var(--accent);
-      color: var(--accent);
-      box-shadow: 0 0 12px var(--accent-glow), inset 0 0 8px var(--accent-glow);
-      background: rgba(108,99,255,0.1);
-    }
+      .activity-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .chip {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        background: var(--surface-alt);
+        border: 2px solid var(--border);
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+        text-transform: capitalize;
+      }
+      .chip.active {
+        border-color: var(--accent);
+        color: var(--accent);
+        box-shadow:
+          0 0 12px var(--accent-glow),
+          inset 0 0 8px var(--accent-glow);
+        background: rgba(108, 99, 255, 0.1);
+      }
 
-    /* ─── Activity Log Table ─────────────────────────────────── */
-    .log-controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-      align-items: center;
-    }
-    .search-input {
-      flex: 1;
-      max-width: 320px;
-      padding: 9px 14px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--surface-alt);
-      color: var(--text);
-      font-size: 0.88rem;
-      transition: border-color var(--transition);
-    }
-    .search-input:focus { outline: none; border-color: var(--accent); }
-    .search-input::placeholder { color: var(--text-muted); }
+      /* ─── Employees ─────────────────────────────────────────── */
+      .employee-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .field-group label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        letter-spacing: 0.3px;
+      }
+      .field-hint {
+        font-size: 0.76rem;
+        color: var(--text-muted);
+      }
+      .field-hint.warning {
+        color: var(--warning);
+      }
+      .field-hint.error {
+        color: var(--danger);
+      }
+      .field-hint.success {
+        color: var(--success);
+      }
+      .enrollment-mode-switch {
+        display: inline-flex;
+        gap: 8px;
+        padding: 6px;
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        margin-bottom: 16px;
+      }
+      .mode-chip {
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 8px 14px;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .mode-chip.active {
+        background: linear-gradient(
+          135deg,
+          rgba(108, 99, 255, 0.22),
+          rgba(108, 99, 255, 0.08)
+        );
+        color: #fff;
+      }
+      .enrollment-panel {
+        display: none;
+      }
+      .enrollment-panel.active {
+        display: block;
+      }
+      .webcam-shell {
+        display: grid;
+        grid-template-columns: minmax(280px, 420px) 1fr;
+        gap: 20px;
+        align-items: start;
+        margin-bottom: 16px;
+      }
+      .webcam-preview {
+        width: 100%;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        background: #000;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+      }
+      .capture-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .thumb-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .thumb-card {
+        position: relative;
+        padding: 10px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+      }
+      .thumb-card img {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        border-radius: 10px;
+        margin-bottom: 8px;
+      }
+      .thumb-meta {
+        font-size: 0.74rem;
+        color: var(--text-muted);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .thumb-remove {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(15, 17, 23, 0.85);
+        color: #fff;
+        font-size: 0.9rem;
+        line-height: 1;
+      }
+      .quality-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+      }
+      .quality-pill {
+        padding: 10px 12px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        min-width: 170px;
+      }
+      .quality-pill.good {
+        border-color: rgba(34, 197, 94, 0.4);
+        color: var(--success);
+      }
+      .quality-pill.warn {
+        border-color: rgba(245, 158, 11, 0.4);
+        color: var(--warning);
+      }
+      .quality-pill.bad {
+        border-color: rgba(239, 68, 68, 0.4);
+        color: var(--danger);
+      }
+      .employee-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin: 20px 0;
+      }
+      .employee-stat {
+        padding: 18px 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
+      .employee-stat .label {
+        display: block;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+      }
+      .employee-stat .value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: var(--text);
+      }
+      .employee-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 14px;
+      }
+      .employee-toolbar .search-input {
+        max-width: 340px;
+      }
+      .employee-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      .employee-card {
+        position: relative;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .employee-card-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .employee-avatar,
+      .employee-avatar-fallback {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        border: 1px solid var(--border);
+        object-fit: cover;
+        background: var(--surface-alt);
+      }
+      .employee-avatar-fallback {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+        font-weight: 700;
+      }
+      .employee-card h4 {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .employee-subtle {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+      }
+      .employee-meta-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
+      .employee-meta-list strong {
+        color: var(--text);
+        font-weight: 600;
+      }
+      .employee-empty {
+        padding: 28px;
+        border-radius: var(--radius);
+        border: 1px dashed var(--border);
+        color: var(--text-muted);
+        text-align: center;
+        background: rgba(108, 99, 255, 0.04);
+      }
+      @media (max-width: 900px) {
+        .webcam-shell {
+          grid-template-columns: 1fr;
+        }
+      }
 
-    .log-table { width: 100%; border-collapse: collapse; }
-    .log-table th {
-      padding: 12px 16px;
-      text-align: left;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-size: 0.72rem;
-      letter-spacing: 1px;
-      font-weight: 600;
-      border-bottom: 2px solid var(--border);
-      cursor: pointer;
-      user-select: none;
-    }
-    .log-table th:hover { color: var(--accent); }
-    .log-table td {
-      padding: 10px 16px;
-      border-bottom: 1px solid rgba(46,51,72,0.5);
-      font-size: 0.85rem;
-    }
-    .log-table tr { transition: background var(--transition); }
-    .log-table tbody tr:hover { background: var(--surface-alt); }
+      /* ─── Activity Log Table ─────────────────────────────────── */
+      .log-controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+        align-items: center;
+      }
+      .search-input {
+        flex: 1;
+        max-width: 320px;
+        padding: 9px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface-alt);
+        color: var(--text);
+        font-size: 0.88rem;
+        transition: border-color var(--transition);
+      }
+      .search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .search-input::placeholder {
+        color: var(--text-muted);
+      }
 
-    .pagination {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      margin-top: 16px;
-    }
-    .pagination button {
-      padding: 6px 14px;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      color: var(--text);
-      font-size: 0.82rem;
-      transition: all var(--transition);
-    }
-    .pagination button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-    .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .pagination .page-info { font-size: 0.82rem; color: var(--text-muted); }
+      .log-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .log-table th {
+        padding: 12px 16px;
+        text-align: left;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        font-size: 0.72rem;
+        letter-spacing: 1px;
+        font-weight: 600;
+        border-bottom: 2px solid var(--border);
+        cursor: pointer;
+        user-select: none;
+      }
+      .log-table th:hover {
+        color: var(--accent);
+      }
+      .log-table td {
+        padding: 10px 16px;
+        border-bottom: 1px solid rgba(46, 51, 72, 0.5);
+        font-size: 0.85rem;
+      }
+      .log-table tr {
+        transition: background var(--transition);
+      }
+      .log-table tbody tr:hover {
+        background: var(--surface-alt);
+      }
 
-    /* ─── Inline confidence bar (table) ──────────────────────── */
-    .inline-conf {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .inline-conf-bar {
-      width: 80px;
-      height: 5px;
-      background: var(--border);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .inline-conf-fill {
-      height: 100%;
-      border-radius: 3px;
-      transition: width 0.3s ease;
-    }
-    .inline-conf-val { font-size: 0.8rem; min-width: 38px; font-variant-numeric: tabular-nums; }
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .pagination button {
+        padding: 6px 14px;
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font-size: 0.82rem;
+        transition: all var(--transition);
+      }
+      .pagination button:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .pagination button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .pagination .page-info {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
 
-    /* ─── Alerts ─────────────────────────────────────────────── */
-    .alert-config-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 12px;
-      margin-bottom: 28px;
-    }
-    .alert-config-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-    }
-    .alert-config-item .label {
-      flex: 1;
-      font-size: 0.85rem;
-      font-weight: 500;
-      text-transform: capitalize;
-    }
-    .toggle {
-      position: relative;
-      width: 42px;
-      height: 22px;
-      background: var(--border);
-      border-radius: 11px;
-      cursor: pointer;
-      transition: background var(--transition);
-    }
-    .toggle.active { background: var(--accent); }
-    .toggle::after {
-      content: '';
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 16px; height: 16px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform var(--transition);
-    }
-    .toggle.active::after { transform: translateX(20px); }
-    .threshold-slider {
-      width: 70px;
-      accent-color: var(--accent);
-    }
-    .threshold-val {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      min-width: 32px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
+      /* ─── Inline confidence bar (table) ──────────────────────── */
+      .inline-conf {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .inline-conf-bar {
+        width: 80px;
+        height: 5px;
+        background: var(--border);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .inline-conf-fill {
+        height: 100%;
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+      .inline-conf-val {
+        font-size: 0.8rem;
+        min-width: 38px;
+        font-variant-numeric: tabular-nums;
+      }
 
-    .alert-feed { display: flex; flex-direction: column; gap: 10px; }
-    .alert-toast {
-      padding: 14px 18px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 4px solid var(--danger);
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      animation: slideIn 0.35s ease;
-    }
-    .alert-toast .alert-label {
-      font-weight: 600;
-      text-transform: capitalize;
-      flex: 1;
-    }
-    .alert-toast .alert-conf {
-      color: var(--danger);
-      font-weight: 700;
-      font-size: 0.9rem;
-    }
-    .alert-toast .alert-time {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+      /* ─── Alerts ─────────────────────────────────────────────── */
+      .alert-config-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .alert-config-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+      }
+      .alert-config-item .label {
+        flex: 1;
+        font-size: 0.85rem;
+        font-weight: 500;
+        text-transform: capitalize;
+      }
+      .toggle {
+        position: relative;
+        width: 42px;
+        height: 22px;
+        background: var(--border);
+        border-radius: 11px;
+        cursor: pointer;
+        transition: background var(--transition);
+      }
+      .toggle.active {
+        background: var(--accent);
+      }
+      .toggle::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform var(--transition);
+      }
+      .toggle.active::after {
+        transform: translateX(20px);
+      }
+      .threshold-slider {
+        width: 70px;
+        accent-color: var(--accent);
+      }
+      .threshold-val {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        min-width: 32px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
 
-    /* ─── Export ─────────────────────────────────────────────── */
-    .export-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 18px;
-      margin-bottom: 24px;
-    }
-    .export-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      padding: 32px 24px;
-      text-align: center;
-    }
-    .export-card svg { opacity: 0.6; }
-    .export-card h3 { font-size: 1rem; font-weight: 600; }
-    .export-card p { font-size: 0.82rem; color: var(--text-muted); }
+      .alert-feed {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .alert-toast {
+        padding: 14px 18px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--danger);
+        border-radius: var(--radius-sm);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        animation: slideIn 0.35s ease;
+      }
+      .alert-toast .alert-label {
+        font-weight: 600;
+        text-transform: capitalize;
+        flex: 1;
+      }
+      .alert-toast .alert-conf {
+        color: var(--danger);
+        font-weight: 700;
+        font-size: 0.9rem;
+      }
+      .alert-toast .alert-time {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+      }
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
 
-    .export-summary { margin-top: 4px; }
-    .export-summary .stat-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.88rem;
-    }
-    .export-summary .stat-row span:first-child { color: var(--text-muted); }
+      /* ─── Export ─────────────────────────────────────────────── */
+      .export-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+      }
+      .export-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .export-card svg {
+        opacity: 0.6;
+      }
+      .export-card h3 {
+        font-size: 1rem;
+        font-weight: 600;
+      }
+      .export-card p {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+      }
 
-    /* ─── Toast Notifications ────────────────────────────────── */
-    #toast-container {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 8px;
-    }
-    .toast {
-      padding: 12px 20px;
-      border-radius: var(--radius-sm);
-      font-size: 0.85rem;
-      font-weight: 500;
-      color: #fff;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-      animation: toastIn 0.3s ease;
-      max-width: 360px;
-    }
-    .toast-error { background: var(--danger); }
-    .toast-success { background: var(--success); }
-    .toast-info { background: var(--accent); }
-    @keyframes toastIn {
-      from { opacity: 0; transform: translateX(30px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
+      .export-summary {
+        margin-top: 4px;
+      }
+      .export-summary .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.88rem;
+      }
+      .export-summary .stat-row span:first-child {
+        color: var(--text-muted);
+      }
 
-    /* ─── Responsive ─────────────────────────────────────────── */
-    @media (max-width: 1200px) {
-      .charts-row { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
+      /* ─── Toast Notifications ────────────────────────────────── */
+      #toast-container {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 8px;
+      }
+      .toast {
+        padding: 12px 20px;
+        border-radius: var(--radius-sm);
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #fff;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        animation: toastIn 0.3s ease;
+        max-width: 360px;
+      }
+      .toast-error {
+        background: var(--danger);
+      }
+      .toast-success {
+        background: var(--success);
+      }
+      .toast-info {
+        background: var(--accent);
+      }
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateX(30px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(0);
+        }
+      }
 
-<!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
-<nav id="sidebar">
-  <div class="logo">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <defs><linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6c63ff"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-    <h1>ActivityWatch</h1>
-  </div>
-
-  <ul class="nav-links">
-    <li><a href="#" data-tab="dashboard" class="active" id="nav-dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Dashboard
-    </a></li>
-    <li><a href="#" data-tab="upload" id="nav-upload">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Upload Video
-    </a></li>
-    <li><a href="#" data-tab="live" id="nav-live">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-      Live Feed
-    </a></li>
-    <li><a href="#" data-tab="employees" id="nav-employees">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      Employees
-    </a></li>
-    <li><a href="#" data-tab="log" id="nav-log">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      Activity Log
-    </a></li>
-    <li><a href="#" data-tab="alerts" id="nav-alerts">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      Alerts
-    </a></li>
-    <li><a href="#" data-tab="export" id="nav-export">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export
-    </a></li>
-  </ul>
-
-  <div class="sidebar-footer">
-    <div class="status-dot" id="status-dot"></div>
-    <span id="status-text">Connecting…</span>
-  </div>
-</nav>
-
-<!-- ═══════════════════════ MAIN ══════════════════════════ -->
-<main id="main">
-
-  <!-- ── Dashboard ───────────────────────────────────────── -->
-  <section class="tab-panel active" id="tab-dashboard">
-    <h2 class="tab-title">Dashboard</h2>
-
-    <div class="stat-grid">
-      <div class="card stat-card">
-        <span class="label">Detections Today</span>
-        <span class="value" id="stat-detections">0</span>
-      </div>
-      <div class="card stat-card">
-        <span class="label">Most Common Activity</span>
-        <span class="value" id="stat-common" style="font-size:1.2rem">—</span>
-      </div>
-      <div class="card stat-card">
-        <span class="label">Avg Confidence</span>
-        <span class="value" id="stat-confidence">—</span>
-      </div>
-      <div class="card stat-card">
-        <span class="label">Identified Employees</span>
-        <span class="value" id="stat-identified">0</span>
-      </div>
-    </div>
-
-    <div class="charts-row">
-      <div class="card">
-        <h3 style="margin-bottom:14px;font-size:0.95rem;font-weight:600;">Activity Distribution</h3>
-        <div class="chart-container">
-          <canvas id="doughnut-chart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <h3 style="margin-bottom:14px;font-size:0.95rem;font-weight:600;">Recent Timeline</h3>
-        <div class="timeline" id="timeline-list">
-          <p style="color:var(--text-muted);font-size:0.88rem;">No detections yet.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Upload Video ────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-upload">
-    <h2 class="tab-title">Upload Video</h2>
-
-    <div class="drop-zone card" id="drop-zone">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="17 8 12 3 7 8"/>
-        <line x1="12" y1="3" x2="12" y2="15"/>
-      </svg>
-      <p>Drag &amp; drop your video here, or <strong style="color:var(--accent)">click to browse</strong></p>
-      <p style="font-size:0.78rem;margin-top:4px;color:var(--text-muted)">Accepts MP4 and AVI files</p>
-      <p class="filename" id="upload-filename"></p>
-    </div>
-    <input type="file" id="file-input" accept=".mp4,.avi,video/mp4,video/avi" hidden />
-
-    <div class="progress-container" id="upload-progress">
-      <div class="progress-bar-outer">
-        <div class="progress-bar-inner" id="progress-bar"></div>
-      </div>
-      <p class="progress-text" id="progress-text">Processing… 0%</p>
-    </div>
-
-    <div class="video-result" id="video-result">
-      <h3 style="margin-bottom:12px;font-weight:600;">Annotated Output</h3>
-      <video id="result-video" controls></video>
-      <div style="margin-top:12px">
-        <button class="btn btn-primary" id="download-video-btn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download Annotated Video
-        </button>
-      </div>
-      <div class="summary-table" id="video-summary">
-        <h4 style="margin-bottom:10px;font-weight:600;font-size:0.95rem;">Detection Summary</h4>
-        <table>
-          <thead><tr><th>Activity</th><th>Count</th><th>Avg Confidence</th></tr></thead>
-          <tbody id="summary-tbody"></tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Live Feed ───────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-live">
-    <h2 class="tab-title">Live Feed</h2>
-
-    <div class="live-controls">
-      <button class="btn btn-primary" id="btn-start-camera">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        Start Camera
-      </button>
-      <button class="btn btn-danger" id="btn-stop-camera" disabled>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-        Stop Camera
-      </button>
-      <select class="search-input" id="quality-selector" style="width:auto; margin-left: 8px;">
-        <option value="high" selected>High (640×480)</option>
-        <option value="medium">Medium (480×360)</option>
-        <option value="low">Low (320×240)</option>
-      </select>
-    </div>
-
-    <div class="live-container">
-      <canvas id="live-canvas" class="live-canvas" width="640" height="480"></canvas>
-      <div class="fps-counter" id="fps-counter">0 FPS</div>
-      <div class="fps-counter" id="perf-badge" style="right: 80px; background: rgba(0,0,0,0.5); color: var(--text-muted);">Avg Inference: -- ms</div>
-    </div>
-
-    <video id="hidden-video" autoplay playsinline style="display:none"></video>
-    <canvas id="hidden-canvas" width="640" height="480" style="display:none"></canvas>
-
-    <div class="activity-chips" id="activity-chips"></div>
-    <div class="activity-chips" id="active-employees-chips" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);"></div>
-  </section>
-
-  <!-- ── Employees ───────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-employees">
-    <h2 class="tab-title">Employees</h2>
-    
-    <div class="card" style="margin-bottom: 24px;">
-      <h3 style="margin-bottom:14px;font-weight:600;">Enroll New Employee</h3>
-      <div style="display:flex; gap: 16px; margin-bottom: 16px;">
-        <input type="text" id="enroll-id" class="search-input" placeholder="Employee ID (e.g., EMP001)" style="max-width: 240px;">
-        <input type="text" id="enroll-name" class="search-input" placeholder="Full Name (e.g., Jane Smith)" style="flex: 1; max-width: 320px;">
-      </div>
-      <div class="drop-zone" id="enroll-drop-zone" style="padding: 32px; margin-bottom: 16px;">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+      /* ─── Responsive ─────────────────────────────────────────── */
+      @media (max-width: 1200px) {
+        .charts-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ═══════════════════════ SIDEBAR ═══════════════════════ -->
+    <nav id="sidebar">
+      <div class="logo">
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="url(#logo-grad)"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#6c63ff" />
+              <stop offset="100%" stop-color="#a78bfa" />
+            </linearGradient>
+          </defs>
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
         </svg>
-        <p>Drop photo(s) here, or <strong style="color:var(--accent)">click to browse</strong></p>
-        <img id="enroll-preview" style="display:none; max-height:100px; border-radius:var(--radius-sm); margin-top:12px; margin-left:auto; margin-right:auto;">
-        <p class="filename" id="enroll-filename"></p>
-      </div>
-      <input type="file" id="enroll-file-input" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden multiple />
-      <button class="btn btn-primary" id="btn-enroll">Enroll Employee</button>
-    </div>
-
-    <h3 style="margin-bottom:14px;font-weight:600;">Enrolled Employees</h3>
-    <div id="employees-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px;">
-      <!-- Employee cards populated here -->
-    </div>
-  </section>
-
-  <!-- ── Activity Log ────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-log">
-    <h2 class="tab-title">Activity Log</h2>
-
-    <div class="log-controls">
-      <input type="text" class="search-input" id="log-search" placeholder="Search activities…" />
-    </div>
-
-    <div class="card" style="overflow-x:auto">
-      <table class="log-table" id="log-table">
-        <thead>
-          <tr>
-            <th data-sort="timestamp">Timestamp ↕</th>
-            <th data-sort="mode">Mode ↕</th>
-            <th data-sort="employee_name">Employee ↕</th>
-            <th data-sort="label">Activity ↕</th>
-            <th data-sort="confidence">Confidence ↕</th>
-          </tr>
-        </thead>
-        <tbody id="log-tbody"></tbody>
-      </table>
-    </div>
-
-    <div class="pagination" id="log-pagination">
-      <button id="log-prev" disabled>← Prev</button>
-      <span class="page-info" id="log-page-info">Page 1</span>
-      <button id="log-next">Next →</button>
-    </div>
-  </section>
-
-  <!-- ── Alerts ──────────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-alerts">
-    <h2 class="tab-title">Alerts Configuration</h2>
-
-    <div class="alert-config-grid" id="alert-config-grid"></div>
-
-    <h3 style="margin-bottom:14px;font-weight:600;">Alert Feed</h3>
-    <div class="alert-feed" id="alert-feed">
-      <p style="color:var(--text-muted);font-size:0.88rem;">No alerts triggered yet.</p>
-    </div>
-  </section>
-
-  <!-- ── Export ──────────────────────────────────────────── -->
-  <section class="tab-panel" id="tab-export">
-    <h2 class="tab-title">Export Data</h2>
-
-    <div class="export-grid">
-      <div class="card export-card">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <h3>Activity Log CSV</h3>
-        <p>Download all detection events as a CSV spreadsheet</p>
-        <button class="btn btn-primary" id="btn-export-csv" style="margin-top:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download CSV
-        </button>
+        <h1>ActivityWatch</h1>
       </div>
 
-      <div class="card export-card">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-        <h3>Annotated Video</h3>
-        <p>Download the last processed annotated video</p>
-        <button class="btn btn-secondary" id="btn-export-video" disabled style="margin-top:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download Video
-        </button>
+      <ul class="nav-links">
+        <li>
+          <a href="#" data-tab="dashboard" class="active" id="nav-dashboard">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="upload" id="nav-upload">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            Upload Video
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="live" id="nav-live">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            Live Feed
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="employees" id="nav-employees">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Employees
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="log" id="nav-log">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+            Activity Log
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="alerts" id="nav-alerts">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            Alerts
+          </a>
+        </li>
+        <li>
+          <a href="#" data-tab="export" id="nav-export">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Export
+          </a>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Connecting…</span>
       </div>
-    </div>
+    </nav>
 
-    <div class="card export-summary" style="max-width:500px">
-      <h3 style="margin-bottom:12px;font-weight:600;font-size:0.95rem;">Session Summary</h3>
-      <div class="stat-row"><span>Total Detections</span><span id="export-total">0</span></div>
-      <div class="stat-row"><span>Session Duration</span><span id="export-duration">0m 0s</span></div>
-      <div class="stat-row"><span>Most Active Period</span><span id="export-active">—</span></div>
-    </div>
-  </section>
+    <!-- ═══════════════════════ MAIN ══════════════════════════ -->
+    <main id="main">
+      <!-- ── Dashboard ───────────────────────────────────────── -->
+      <section class="tab-panel active" id="tab-dashboard">
+        <h2 class="tab-title">Dashboard</h2>
 
-</main>
+        <div class="stat-grid">
+          <div class="card stat-card">
+            <span class="label">Detections Today</span>
+            <span class="value" id="stat-detections">0</span>
+          </div>
+          <div class="card stat-card">
+            <span class="label">Most Common Activity</span>
+            <span class="value" id="stat-common" style="font-size: 1.2rem"
+              >—</span
+            >
+          </div>
+          <div class="card stat-card">
+            <span class="label">Avg Confidence</span>
+            <span class="value" id="stat-confidence">—</span>
+          </div>
+          <div class="card stat-card">
+            <span class="label">Identified Employees</span>
+            <span class="value" id="stat-identified">0</span>
+          </div>
+        </div>
 
-<!-- ═══════════════════════ TOASTS ════════════════════════ -->
-<div id="toast-container"></div>
+        <div class="charts-row">
+          <div class="card">
+            <h3
+              style="margin-bottom: 14px; font-size: 0.95rem; font-weight: 600"
+            >
+              Activity Distribution
+            </h3>
+            <div class="chart-container">
+              <canvas id="doughnut-chart"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <h3
+              style="margin-bottom: 14px; font-size: 0.95rem; font-weight: 600"
+            >
+              Recent Timeline
+            </h3>
+            <div class="timeline" id="timeline-list">
+              <p style="color: var(--text-muted); font-size: 0.88rem">
+                No detections yet.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-<script>
-/* ═══════════════════════════════════════════════════════════════════
+      <!-- ── Upload Video ────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-upload">
+        <h2 class="tab-title">Upload Video</h2>
+
+        <div class="drop-zone card" id="drop-zone">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--text-muted)"
+            stroke-width="1.5"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <p>
+            Drag &amp; drop your video here, or
+            <strong style="color: var(--accent)">click to browse</strong>
+          </p>
+          <p
+            style="
+              font-size: 0.78rem;
+              margin-top: 4px;
+              color: var(--text-muted);
+            "
+          >
+            Accepts MP4 and AVI files
+          </p>
+          <p class="filename" id="upload-filename"></p>
+        </div>
+        <input
+          type="file"
+          id="file-input"
+          accept=".mp4,.avi,video/mp4,video/avi"
+          hidden
+        />
+
+        <div class="progress-container" id="upload-progress">
+          <div class="progress-bar-outer">
+            <div class="progress-bar-inner" id="progress-bar"></div>
+          </div>
+          <p class="progress-text" id="progress-text">Processing… 0%</p>
+        </div>
+
+        <div class="video-result" id="video-result">
+          <h3 style="margin-bottom: 12px; font-weight: 600">
+            Annotated Output
+          </h3>
+          <video id="result-video" controls></video>
+          <div style="margin-top: 12px">
+            <button class="btn btn-primary" id="download-video-btn">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download Annotated Video
+            </button>
+          </div>
+          <div class="summary-table" id="video-summary">
+            <h4
+              style="margin-bottom: 10px; font-weight: 600; font-size: 0.95rem"
+            >
+              Detection Summary
+            </h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th>Count</th>
+                  <th>Avg Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="summary-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Live Feed ───────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-live">
+        <h2 class="tab-title">Live Feed</h2>
+
+        <div class="live-controls">
+          <button class="btn btn-primary" id="btn-start-camera">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            Start Camera
+          </button>
+          <button class="btn btn-danger" id="btn-stop-camera" disabled>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+            </svg>
+            Stop Camera
+          </button>
+          <select
+            class="search-input"
+            id="quality-selector"
+            style="width: auto; margin-left: 8px"
+          >
+            <option value="high" selected>High (640×480)</option>
+            <option value="medium">Medium (480×360)</option>
+            <option value="low">Low (320×240)</option>
+          </select>
+        </div>
+
+        <div class="live-container">
+          <canvas
+            id="live-canvas"
+            class="live-canvas"
+            width="640"
+            height="480"
+          ></canvas>
+          <div class="fps-counter" id="fps-counter">0 FPS</div>
+          <div
+            class="fps-counter"
+            id="perf-badge"
+            style="
+              right: 80px;
+              background: rgba(0, 0, 0, 0.5);
+              color: var(--text-muted);
+            "
+          >
+            Avg Inference: -- ms
+          </div>
+        </div>
+
+        <video
+          id="hidden-video"
+          autoplay
+          playsinline
+          style="display: none"
+        ></video>
+        <canvas
+          id="hidden-canvas"
+          width="640"
+          height="480"
+          style="display: none"
+        ></canvas>
+
+        <div class="activity-chips" id="activity-chips"></div>
+        <div
+          class="activity-chips"
+          id="active-employees-chips"
+          style="
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+          "
+        ></div>
+      </section>
+
+      <!-- ── Employees ───────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-employees">
+        <h2 class="tab-title">Employees</h2>
+
+        <div class="card" style="margin-bottom: 24px">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              gap: 16px;
+              align-items: flex-start;
+              flex-wrap: wrap;
+              margin-bottom: 14px;
+            "
+          >
+            <div>
+              <h3 style="margin-bottom: 6px; font-weight: 600">
+                Enroll New Employee
+              </h3>
+              <p class="field-hint">
+                Create employee profiles with uploads or webcam captures.
+              </p>
+            </div>
+            <div class="field-hint" id="enroll-status-message"></div>
+          </div>
+
+          <div class="employee-form-grid">
+            <div class="field-group">
+              <label for="enroll-id">Employee ID</label>
+              <input
+                type="text"
+                id="enroll-id"
+                class="search-input"
+                placeholder="EMP001"
+                style="max-width: 240px"
+              />
+              <div class="field-hint" id="enroll-id-hint">
+                Auto-generated from existing employees. You can edit it.
+              </div>
+            </div>
+            <div class="field-group">
+              <label for="enroll-name">Full Name</label>
+              <input
+                type="text"
+                id="enroll-name"
+                class="search-input"
+                placeholder="Jane Smith"
+                style="max-width: 360px"
+              />
+              <div class="field-hint" id="enroll-name-hint">
+                Use a clear display name for live recognition results.
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="enrollment-mode-switch"
+            role="tablist"
+            aria-label="Enrollment mode"
+          >
+            <button
+              class="mode-chip active"
+              id="mode-upload"
+              data-mode="upload"
+              type="button"
+            >
+              Upload Photos
+            </button>
+            <button
+              class="mode-chip"
+              id="mode-webcam"
+              data-mode="webcam"
+              type="button"
+            >
+              Capture From Webcam
+            </button>
+          </div>
+
+          <div class="enrollment-panel active" id="upload-enrollment-panel">
+            <div
+              class="drop-zone"
+              id="enroll-drop-zone"
+              style="padding: 32px; margin-bottom: 16px"
+            >
+              <svg
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--text-muted)"
+                stroke-width="1.5"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <p>
+                Drop photo(s) here, or
+                <strong style="color: var(--accent)">click to browse</strong>
+              </p>
+              <p class="field-hint" style="margin-top: 6px">
+                Aim for 3–5 photos with varied angles for the best demo results.
+              </p>
+              <p class="filename" id="enroll-filename"></p>
+            </div>
+            <input
+              type="file"
+              id="enroll-file-input"
+              accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+              hidden
+              multiple
+            />
+          </div>
+
+          <div class="enrollment-panel" id="webcam-enrollment-panel">
+            <div class="webcam-shell">
+              <div>
+                <video
+                  id="enroll-webcam-video"
+                  class="webcam-preview"
+                  autoplay
+                  playsinline
+                  muted
+                ></video>
+                <canvas
+                  id="enroll-webcam-canvas"
+                  width="640"
+                  height="480"
+                  style="display: none"
+                ></canvas>
+                <div class="capture-actions">
+                  <button
+                    class="btn btn-secondary"
+                    id="btn-start-enroll-camera"
+                    type="button"
+                  >
+                    Start Camera
+                  </button>
+                  <button
+                    class="btn btn-primary"
+                    id="btn-capture-enroll-photo"
+                    type="button"
+                    disabled
+                  >
+                    Capture Photo
+                  </button>
+                  <button
+                    class="btn btn-danger"
+                    id="btn-retake-enroll-photo"
+                    type="button"
+                    disabled
+                  >
+                    Retake Last
+                  </button>
+                </div>
+                <div
+                  class="field-hint"
+                  id="webcam-hint"
+                  style="margin-top: 10px"
+                >
+                  Capture 3–5 photos from slightly different angles.
+                </div>
+              </div>
+              <div>
+                <div class="employee-empty" id="webcam-empty-state">
+                  Start the camera to capture enrollment photos for this
+                  employee.
+                </div>
+                <div class="thumb-grid" id="webcam-capture-grid"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quality-strip" id="enrollment-quality-strip"></div>
+          <div
+            class="field-hint"
+            id="enroll-warning-banner"
+            style="margin-top: 12px"
+          ></div>
+
+          <div
+            style="
+              display: flex;
+              gap: 12px;
+              align-items: center;
+              flex-wrap: wrap;
+              margin-top: 18px;
+            "
+          >
+            <button class="btn btn-primary" id="btn-enroll">
+              Enroll Employee
+            </button>
+            <button
+              class="btn btn-secondary"
+              id="btn-reset-enrollment"
+              type="button"
+            >
+              Reset Form
+            </button>
+          </div>
+        </div>
+
+        <div class="employee-stats">
+          <div class="employee-stat">
+            <span class="label">Total Employees</span
+            ><span class="value" id="employees-total">0</span>
+          </div>
+          <div class="employee-stat">
+            <span class="label">Total Face Embeddings</span
+            ><span class="value" id="employees-embeddings">0</span>
+          </div>
+          <div class="employee-stat">
+            <span class="label">Avg Photos / Employee</span
+            ><span class="value" id="employees-average">0.0</span>
+          </div>
+        </div>
+
+        <div class="employee-toolbar">
+          <h3 style="font-weight: 600">Enrolled Employees</h3>
+          <input
+            type="text"
+            class="search-input"
+            id="employee-search"
+            placeholder="Search by employee name or ID"
+          />
+        </div>
+        <div id="employees-grid" class="employee-grid">
+          <div class="employee-empty">No employees enrolled yet.</div>
+        </div>
+      </section>
+
+      <!-- ── Activity Log ────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-log">
+        <h2 class="tab-title">Activity Log</h2>
+
+        <div class="log-controls">
+          <input
+            type="text"
+            class="search-input"
+            id="log-search"
+            placeholder="Search activities…"
+          />
+        </div>
+
+        <div class="card" style="overflow-x: auto">
+          <table class="log-table" id="log-table">
+            <thead>
+              <tr>
+                <th data-sort="timestamp">Timestamp ↕</th>
+                <th data-sort="mode">Mode ↕</th>
+                <th data-sort="employee_name">Employee ↕</th>
+                <th data-sort="label">Activity ↕</th>
+                <th data-sort="confidence">Confidence ↕</th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="log-pagination">
+          <button id="log-prev" disabled>← Prev</button>
+          <span class="page-info" id="log-page-info">Page 1</span>
+          <button id="log-next">Next →</button>
+        </div>
+      </section>
+
+      <!-- ── Alerts ──────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-alerts">
+        <h2 class="tab-title">Alerts Configuration</h2>
+
+        <div class="alert-config-grid" id="alert-config-grid"></div>
+
+        <h3 style="margin-bottom: 14px; font-weight: 600">Alert Feed</h3>
+        <div class="alert-feed" id="alert-feed">
+          <p style="color: var(--text-muted); font-size: 0.88rem">
+            No alerts triggered yet.
+          </p>
+        </div>
+      </section>
+
+      <!-- ── Export ──────────────────────────────────────────── -->
+      <section class="tab-panel" id="tab-export">
+        <h2 class="tab-title">Export Data</h2>
+
+        <div class="export-grid">
+          <div class="card export-card">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--success)"
+              stroke-width="1.5"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <h3>Activity Log CSV</h3>
+            <p>Download all detection events as a CSV spreadsheet</p>
+            <button
+              class="btn btn-primary"
+              id="btn-export-csv"
+              style="margin-top: 8px"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download CSV
+            </button>
+          </div>
+
+          <div class="card export-card">
+            <svg
+              width="40"
+              height="40"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--accent)"
+              stroke-width="1.5"
+            >
+              <path d="M23 7l-7 5 7 5V7z" />
+              <rect x="1" y="5" width="15" height="14" rx="2" />
+            </svg>
+            <h3>Annotated Video</h3>
+            <p>Download the last processed annotated video</p>
+            <button
+              class="btn btn-secondary"
+              id="btn-export-video"
+              disabled
+              style="margin-top: 8px"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Download Video
+            </button>
+          </div>
+        </div>
+
+        <div class="card export-summary" style="max-width: 500px">
+          <h3 style="margin-bottom: 12px; font-weight: 600; font-size: 0.95rem">
+            Session Summary
+          </h3>
+          <div class="stat-row">
+            <span>Total Detections</span><span id="export-total">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Session Duration</span><span id="export-duration">0m 0s</span>
+          </div>
+          <div class="stat-row">
+            <span>Most Active Period</span><span id="export-active">—</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ═══════════════════════ TOASTS ════════════════════════ -->
+    <div id="toast-container"></div>
+
+    <script>
+      /* ═══════════════════════════════════════════════════════════════════
    ActivityWatch — Frontend Logic
    ═══════════════════════════════════════════════════════════════════ */
-(() => {
-  "use strict";
+      (() => {
+        "use strict";
 
-  // ── Class list ──────────────────────────────────────────────────
-  const CLASSES = [
-    "applauding_presentation","at_team_celebration","commuting_by_bike",
-    "enjoying_team_meeting","greeting_colleague","having_coffee_break",
-    "in_heated_discussion","listening_with_headphones","messaging_on_phone",
-    "on_lunch_break","on_phone_call","rushing_to_meeting",
-    "taking_a_nap","working_at_desk","working_on_laptop"
-  ];
+        // ── Class list ──────────────────────────────────────────────────
+        const CLASSES = [
+          "applauding_presentation",
+          "at_team_celebration",
+          "commuting_by_bike",
+          "enjoying_team_meeting",
+          "greeting_colleague",
+          "having_coffee_break",
+          "in_heated_discussion",
+          "listening_with_headphones",
+          "messaging_on_phone",
+          "on_lunch_break",
+          "on_phone_call",
+          "rushing_to_meeting",
+          "taking_a_nap",
+          "working_at_desk",
+          "working_on_laptop",
+        ];
 
-  const CLASS_COLOURS = [
-    "#6c63ff","#22c55e","#3b82f6","#f97316","#ec4899",
-    "#a855f7","#ef4444","#14b8a6","#eab308","#84cc16",
-    "#0ea5e9","#f43f5e","#6366f1","#22d3ee","#fb923c"
-  ];
+        const CLASS_COLOURS = [
+          "#6c63ff",
+          "#22c55e",
+          "#3b82f6",
+          "#f97316",
+          "#ec4899",
+          "#a855f7",
+          "#ef4444",
+          "#14b8a6",
+          "#eab308",
+          "#84cc16",
+          "#0ea5e9",
+          "#f43f5e",
+          "#6366f1",
+          "#22d3ee",
+          "#fb923c",
+        ];
 
-  // ── State ───────────────────────────────────────────────────────
-  let sessionStart = Date.now();
-  let activityLog = [];
-  let logPage = 1;
-  const LOG_PER_PAGE = 20;
-  let logSort = { key: "timestamp", asc: false };
-  let logSearch = "";
-  let currentJobId = null;
-  let liveWs = null;
-  let mediaStream = null;
-  let captureInterval = null;
-  let wsRetries = 0;
-  let intentionalStop = false;
-  let reconnectTimeout = null;
-  const MAX_WS_RETRIES = 3;
-  let doughnutChart = null;
-  let lastAlertCount = 0;
+        // ── State ───────────────────────────────────────────────────────
+        let sessionStart = Date.now();
+        let activityLog = [];
+        let logPage = 1;
+        const LOG_PER_PAGE = 20;
+        let logSort = { key: "timestamp", asc: false };
+        let logSearch = "";
+        let currentJobId = null;
+        let liveWs = null;
+        let mediaStream = null;
+        let captureInterval = null;
+        let wsRetries = 0;
+        let intentionalStop = false;
+        let reconnectTimeout = null;
+        const MAX_WS_RETRIES = 3;
+        let doughnutChart = null;
+        let lastAlertCount = 0;
 
-  // ── Toast ───────────────────────────────────────────────────────
-  function showToast(msg, type = "info") {
-    const c = document.getElementById("toast-container");
-    const t = document.createElement("div");
-    t.className = `toast toast-${type}`;
-    t.textContent = msg;
-    c.appendChild(t);
-    setTimeout(() => { t.style.opacity = "0"; setTimeout(() => t.remove(), 300); }, 3500);
-  }
-
-  // ── API helpers ─────────────────────────────────────────────────
-  async function apiFetch(url, opts = {}) {
-    try {
-      const r = await fetch(url, opts);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r;
-    } catch (e) {
-      showToast(`API error: ${e.message}`, "error");
-      throw e;
-    }
-  }
-
-  // ── Health check ────────────────────────────────────────────────
-  async function checkHealth() {
-    try {
-      await fetch("/health");
-      document.getElementById("status-dot").classList.add("connected");
-      document.getElementById("status-text").textContent = "Backend connected";
-    } catch {
-      document.getElementById("status-dot").classList.remove("connected");
-      document.getElementById("status-text").textContent = "Disconnected";
-    }
-  }
-  setInterval(checkHealth, 5000);
-  checkHealth();
-
-  // ── Tab navigation ──────────────────────────────────────────────
-  document.querySelectorAll(".nav-links a").forEach(link => {
-    link.addEventListener("click", e => {
-      e.preventDefault();
-      const tab = link.dataset.tab;
-      document.querySelectorAll(".nav-links a").forEach(a => a.classList.remove("active"));
-      link.classList.add("active");
-      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-      const panel = document.getElementById(`tab-${tab}`);
-      panel.classList.add("active");
-      // force reflow for animation
-      void panel.offsetWidth;
-    });
-  });
-
-  // ═══════════════ DASHBOARD ═════════════════════════════════════
-  function updateDashboard() {
-    const log = activityLog;
-    document.getElementById("stat-detections").textContent = log.length;
-
-    if (log.length > 0) {
-      // most common
-      const counts = {};
-      let totalConf = 0;
-      const uniqueEmployees = new Set();
-      log.forEach(e => {
-        counts[e.label] = (counts[e.label] || 0) + 1;
-        totalConf += e.confidence;
-        if (e.employee_name && e.employee_name !== "Unknown") {
-          uniqueEmployees.add(e.employee_name);
+        // ── Toast ───────────────────────────────────────────────────────
+        function showToast(msg, type = "info") {
+          const c = document.getElementById("toast-container");
+          const t = document.createElement("div");
+          t.className = `toast toast-${type}`;
+          t.textContent = msg;
+          c.appendChild(t);
+          setTimeout(() => {
+            t.style.opacity = "0";
+            setTimeout(() => t.remove(), 300);
+          }, 3500);
         }
-      });
-      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-      const topLabel = sorted[0][0].replace(/_/g, " ");
-      document.getElementById("stat-common").textContent = topLabel;
-      document.getElementById("stat-confidence").textContent =
-        (totalConf / log.length * 100).toFixed(1) + "%";
-      document.getElementById("stat-identified").textContent = uniqueEmployees.size;
 
-      // doughnut chart
-      updateDoughnut(counts);
-
-      // timeline
-      updateTimeline(log.slice(-10).reverse());
-    }
-  }
-
-  function updateDoughnut(counts) {
-    const labels = CLASSES.filter(c => counts[c]);
-    const data = labels.map(c => counts[c] || 0);
-    const colours = labels.map(c => CLASS_COLOURS[CLASSES.indexOf(c)]);
-
-    if (doughnutChart) {
-      doughnutChart.data.labels = labels.map(l => l.replace(/_/g, " "));
-      doughnutChart.data.datasets[0].data = data;
-      doughnutChart.data.datasets[0].backgroundColor = colours;
-      doughnutChart.update();
-    } else {
-      const ctx = document.getElementById("doughnut-chart").getContext("2d");
-      doughnutChart = new Chart(ctx, {
-        type: "doughnut",
-        data: {
-          labels: labels.map(l => l.replace(/_/g, " ")),
-          datasets: [{
-            data,
-            backgroundColor: colours,
-            borderWidth: 0,
-            hoverOffset: 8
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: "65%",
-          plugins: {
-            legend: {
-              position: "right",
-              labels: {
-                color: "#8b8fa3",
-                font: { family: "Inter", size: 11 },
-                padding: 12,
-                usePointStyle: true,
-                pointStyleWidth: 10
+        // ── API helpers ─────────────────────────────────────────────────
+        async function apiFetch(url, opts = {}) {
+          try {
+            const r = await fetch(url, opts);
+            if (!r.ok) {
+              let message = `HTTP ${r.status}`;
+              try {
+                const data = await r.clone().json();
+                if (typeof data?.detail === "string") message = data.detail;
+              } catch {
+                try {
+                  const text = await r.clone().text();
+                  if (text) message = text;
+                } catch {}
               }
+              throw new Error(message);
             }
+            return r;
+          } catch (e) {
+            showToast(`API error: ${e.message}`, "error");
+            throw e;
           }
         }
-      });
-    }
-  }
 
-  function updateTimeline(items) {
-    const el = document.getElementById("timeline-list");
-    if (!items.length) return;
-    el.innerHTML = items.map(e => {
-      const t = new Date(e.timestamp);
-      const time = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const conf = (e.confidence * 100).toFixed(0);
-      const badgeClass = conf >= 70 ? "badge-green" : conf >= 40 ? "badge-amber" : "badge-red";
-      const barColour = conf >= 70 ? "var(--success)" : conf >= 40 ? "var(--warning)" : "var(--danger)";
-      return `
+        // ── Health check ────────────────────────────────────────────────
+        async function checkHealth() {
+          try {
+            await fetch("/health");
+            document.getElementById("status-dot").classList.add("connected");
+            document.getElementById("status-text").textContent =
+              "Backend connected";
+          } catch {
+            document.getElementById("status-dot").classList.remove("connected");
+            document.getElementById("status-text").textContent = "Disconnected";
+          }
+        }
+        setInterval(checkHealth, 5000);
+        checkHealth();
+
+        // ── Tab navigation ──────────────────────────────────────────────
+        document.querySelectorAll(".nav-links a").forEach((link) => {
+          link.addEventListener("click", (e) => {
+            e.preventDefault();
+            const tab = link.dataset.tab;
+            document
+              .querySelectorAll(".nav-links a")
+              .forEach((a) => a.classList.remove("active"));
+            link.classList.add("active");
+            document
+              .querySelectorAll(".tab-panel")
+              .forEach((p) => p.classList.remove("active"));
+            const panel = document.getElementById(`tab-${tab}`);
+            panel.classList.add("active");
+            // force reflow for animation
+            void panel.offsetWidth;
+          });
+        });
+
+        // ═══════════════ DASHBOARD ═════════════════════════════════════
+        function updateDashboard() {
+          const log = activityLog;
+          document.getElementById("stat-detections").textContent = log.length;
+
+          if (log.length > 0) {
+            // most common
+            const counts = {};
+            let totalConf = 0;
+            const uniqueEmployees = new Set();
+            log.forEach((e) => {
+              counts[e.label] = (counts[e.label] || 0) + 1;
+              totalConf += e.confidence;
+              if (e.employee_name && e.employee_name !== "Unknown") {
+                uniqueEmployees.add(e.employee_name);
+              }
+            });
+            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            const topLabel = sorted[0][0].replace(/_/g, " ");
+            document.getElementById("stat-common").textContent = topLabel;
+            document.getElementById("stat-confidence").textContent =
+              ((totalConf / log.length) * 100).toFixed(1) + "%";
+            document.getElementById("stat-identified").textContent =
+              uniqueEmployees.size;
+
+            // doughnut chart
+            updateDoughnut(counts);
+
+            // timeline
+            updateTimeline(log.slice(-10).reverse());
+          }
+        }
+
+        function updateDoughnut(counts) {
+          const labels = CLASSES.filter((c) => counts[c]);
+          const data = labels.map((c) => counts[c] || 0);
+          const colours = labels.map((c) => CLASS_COLOURS[CLASSES.indexOf(c)]);
+
+          if (doughnutChart) {
+            doughnutChart.data.labels = labels.map((l) => l.replace(/_/g, " "));
+            doughnutChart.data.datasets[0].data = data;
+            doughnutChart.data.datasets[0].backgroundColor = colours;
+            doughnutChart.update();
+          } else {
+            const ctx = document
+              .getElementById("doughnut-chart")
+              .getContext("2d");
+            doughnutChart = new Chart(ctx, {
+              type: "doughnut",
+              data: {
+                labels: labels.map((l) => l.replace(/_/g, " ")),
+                datasets: [
+                  {
+                    data,
+                    backgroundColor: colours,
+                    borderWidth: 0,
+                    hoverOffset: 8,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: "65%",
+                plugins: {
+                  legend: {
+                    position: "right",
+                    labels: {
+                      color: "#8b8fa3",
+                      font: { family: "Inter", size: 11 },
+                      padding: 12,
+                      usePointStyle: true,
+                      pointStyleWidth: 10,
+                    },
+                  },
+                },
+              },
+            });
+          }
+        }
+
+        function updateTimeline(items) {
+          const el = document.getElementById("timeline-list");
+          if (!items.length) return;
+          el.innerHTML = items
+            .map((e) => {
+              const t = new Date(e.timestamp);
+              const time = t.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              });
+              const conf = (e.confidence * 100).toFixed(0);
+              const badgeClass =
+                conf >= 70
+                  ? "badge-green"
+                  : conf >= 40
+                    ? "badge-amber"
+                    : "badge-red";
+              const barColour =
+                conf >= 70
+                  ? "var(--success)"
+                  : conf >= 40
+                    ? "var(--warning)"
+                    : "var(--danger)";
+              return `
         <div class="timeline-item">
           <span class="time">${time}</span>
           <span class="badge ${badgeClass}">${e.label.replace(/_/g, " ")}</span>
@@ -1080,311 +2066,398 @@
           <span style="font-size:0.78rem;color:var(--text-muted);min-width:32px">${conf}%</span>
         </div>
       `;
-    }).join("");
-  }
-
-  // ═══════════════ UPLOAD VIDEO ══════════════════════════════════
-  const dropZone = document.getElementById("drop-zone");
-  const fileInput = document.getElementById("file-input");
-
-  dropZone.addEventListener("click", () => fileInput.click());
-  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
-  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
-  dropZone.addEventListener("drop", e => {
-    e.preventDefault();
-    dropZone.classList.remove("dragover");
-    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener("change", () => {
-    if (fileInput.files.length) handleFile(fileInput.files[0]);
-  });
-
-  async function handleFile(file) {
-    const nameEl = document.getElementById("upload-filename");
-    nameEl.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
-
-    const form = new FormData();
-    form.append("file", file);
-
-    try {
-      const r = await apiFetch("/upload", { method: "POST", body: form });
-      const data = await r.json();
-      currentJobId = data.job_id;
-      showToast("Upload started — processing…", "success");
-      startPolling(data.job_id);
-    } catch { /* toast shown by apiFetch */ }
-  }
-
-  function startPolling(jobId) {
-    const container = document.getElementById("upload-progress");
-    const bar = document.getElementById("progress-bar");
-    const text = document.getElementById("progress-text");
-    container.style.display = "block";
-    document.getElementById("video-result").style.display = "none";
-
-    const poll = setInterval(async () => {
-      try {
-        const r = await fetch(`/video-status/${jobId}`);
-        const d = await r.json();
-        bar.style.width = d.progress + "%";
-        text.textContent = d.status === "done"
-          ? "Processing complete!"
-          : `Processing… ${d.progress.toFixed(1)}%`;
-
-        if (d.status === "done") {
-          clearInterval(poll);
-          showVideoResult(jobId, d.summary || []);
-          document.getElementById("btn-export-video").disabled = false;
-        } else if (d.status === "error") {
-          clearInterval(poll);
-          showToast("Video processing failed", "error");
+            })
+            .join("");
         }
-      } catch {
-        clearInterval(poll);
-      }
-    }, 1500);
-  }
 
-  function showVideoResult(jobId, summary) {
-    const container = document.getElementById("video-result");
-    container.style.display = "block";
-    const video = document.getElementById("result-video");
-    video.src = `/video-result/${jobId}`;
+        // ═══════════════ UPLOAD VIDEO ══════════════════════════════════
+        const dropZone = document.getElementById("drop-zone");
+        const fileInput = document.getElementById("file-input");
 
-    // download button
-    document.getElementById("download-video-btn").onclick = () => {
-      const a = document.createElement("a");
-      a.href = `/video-result/${jobId}`;
-      a.download = `annotated_${jobId}.mp4`;
-      a.click();
-    };
+        dropZone.addEventListener("click", () => fileInput.click());
+        dropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          dropZone.classList.add("dragover");
+        });
+        dropZone.addEventListener("dragleave", () =>
+          dropZone.classList.remove("dragover"),
+        );
+        dropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropZone.classList.remove("dragover");
+          if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener("change", () => {
+          if (fileInput.files.length) handleFile(fileInput.files[0]);
+        });
 
-    // summary table
-    const tbody = document.getElementById("summary-tbody");
-    tbody.innerHTML = summary.map(s => `
+        async function handleFile(file) {
+          const nameEl = document.getElementById("upload-filename");
+          nameEl.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+
+          const form = new FormData();
+          form.append("file", file);
+
+          try {
+            const r = await apiFetch("/upload", { method: "POST", body: form });
+            const data = await r.json();
+            currentJobId = data.job_id;
+            showToast("Upload started — processing…", "success");
+            startPolling(data.job_id);
+          } catch {
+            /* toast shown by apiFetch */
+          }
+        }
+
+        function startPolling(jobId) {
+          const container = document.getElementById("upload-progress");
+          const bar = document.getElementById("progress-bar");
+          const text = document.getElementById("progress-text");
+          container.style.display = "block";
+          document.getElementById("video-result").style.display = "none";
+
+          const poll = setInterval(async () => {
+            try {
+              const r = await fetch(`/video-status/${jobId}`);
+              const d = await r.json();
+              bar.style.width = d.progress + "%";
+              text.textContent =
+                d.status === "done"
+                  ? "Processing complete!"
+                  : `Processing… ${d.progress.toFixed(1)}%`;
+
+              if (d.status === "done") {
+                clearInterval(poll);
+                showVideoResult(jobId, d.summary || []);
+                document.getElementById("btn-export-video").disabled = false;
+              } else if (d.status === "error") {
+                clearInterval(poll);
+                showToast("Video processing failed", "error");
+              }
+            } catch {
+              clearInterval(poll);
+            }
+          }, 1500);
+        }
+
+        function showVideoResult(jobId, summary) {
+          const container = document.getElementById("video-result");
+          container.style.display = "block";
+          const video = document.getElementById("result-video");
+          video.src = `/video-result/${jobId}`;
+
+          // download button
+          document.getElementById("download-video-btn").onclick = () => {
+            const a = document.createElement("a");
+            a.href = `/video-result/${jobId}`;
+            a.download = `annotated_${jobId}.mp4`;
+            a.click();
+          };
+
+          // summary table
+          const tbody = document.getElementById("summary-tbody");
+          tbody.innerHTML = summary
+            .map(
+              (s) => `
       <tr>
         <td style="text-transform:capitalize">${s.label.replace(/_/g, " ")}</td>
         <td>${s.count}</td>
         <td>${(s.avg_confidence * 100).toFixed(1)}%</td>
       </tr>
-    `).join("");
-  }
+    `,
+            )
+            .join("");
+        }
 
-  // ═══════════════ LIVE FEED ═════════════════════════════════════
-  const btnStart = document.getElementById("btn-start-camera");
-  const btnStop = document.getElementById("btn-stop-camera");
-  const liveCanvas = document.getElementById("live-canvas");
-  const liveCtx = liveCanvas.getContext("2d");
-  const hiddenVideo = document.getElementById("hidden-video");
-  const hiddenCanvas = document.getElementById("hidden-canvas");
-  const hiddenCtx = hiddenCanvas.getContext("2d");
-  const qualitySelector = document.getElementById("quality-selector");
+        // ═══════════════ LIVE FEED ═════════════════════════════════════
+        const btnStart = document.getElementById("btn-start-camera");
+        const btnStop = document.getElementById("btn-stop-camera");
+        const liveCanvas = document.getElementById("live-canvas");
+        const liveCtx = liveCanvas.getContext("2d");
+        const hiddenVideo = document.getElementById("hidden-video");
+        const hiddenCanvas = document.getElementById("hidden-canvas");
+        const hiddenCtx = hiddenCanvas.getContext("2d");
+        const qualitySelector = document.getElementById("quality-selector");
 
-  const QUALITY_SETTINGS = {
-    high: { width: 640, height: 480, quality: 0.7 },
-    medium: { width: 480, height: 360, quality: 0.6 },
-    low: { width: 320, height: 240, quality: 0.5 }
-  };
-  let currentQuality = QUALITY_SETTINGS.high;
+        const QUALITY_SETTINGS = {
+          high: { width: 640, height: 480, quality: 0.7 },
+          medium: { width: 480, height: 360, quality: 0.6 },
+          low: { width: 320, height: 240, quality: 0.5 },
+        };
+        let currentQuality = QUALITY_SETTINGS.high;
 
-  // Build activity chips
-  const chipsContainer = document.getElementById("activity-chips");
-  CLASSES.forEach(cls => {
-    const chip = document.createElement("div");
-    chip.className = "chip";
-    chip.dataset.cls = cls;
-    chip.textContent = cls.replace(/_/g, " ");
-    chipsContainer.appendChild(chip);
-  });
+        // Build activity chips
+        const chipsContainer = document.getElementById("activity-chips");
+        CLASSES.forEach((cls) => {
+          const chip = document.createElement("div");
+          chip.className = "chip";
+          chip.dataset.cls = cls;
+          chip.textContent = cls.replace(/_/g, " ");
+          chipsContainer.appendChild(chip);
+        });
 
-  btnStart.addEventListener("click", startCamera);
-  btnStop.addEventListener("click", () => stopCamera({ intentional: true }));
-  qualitySelector.addEventListener("change", async () => {
-    if (mediaStream) {
-      await startCamera({ recreateSocket: true });
-    }
-  });
+        btnStart.addEventListener("click", startCamera);
+        btnStop.addEventListener("click", () =>
+          stopCamera({ intentional: true }),
+        );
+        qualitySelector.addEventListener("change", async () => {
+          if (mediaStream) {
+            await startCamera({ recreateSocket: true });
+          }
+        });
 
-  async function startCamera({ recreateSocket = false } = {}) {
-    if (mediaStream) stopCamera({ intentional: true, preserveCanvas: recreateSocket });
-    try {
-      currentQuality = QUALITY_SETTINGS[qualitySelector.value];
-      liveCanvas.width = currentQuality.width;
-      liveCanvas.height = currentQuality.height;
-      hiddenCanvas.width = currentQuality.width;
-      hiddenCanvas.height = currentQuality.height;
+        async function startCamera({ recreateSocket = false } = {}) {
+          if (mediaStream)
+            stopCamera({ intentional: true, preserveCanvas: recreateSocket });
+          try {
+            currentQuality = QUALITY_SETTINGS[qualitySelector.value];
+            liveCanvas.width = currentQuality.width;
+            liveCanvas.height = currentQuality.height;
+            hiddenCanvas.width = currentQuality.width;
+            hiddenCanvas.height = currentQuality.height;
 
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: currentQuality.width, height: currentQuality.height, facingMode: "user" }
-      });
-      hiddenVideo.srcObject = mediaStream;
-      await hiddenVideo.play();
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: currentQuality.width,
+                height: currentQuality.height,
+                facingMode: "user",
+              },
+            });
+            hiddenVideo.srcObject = mediaStream;
+            await hiddenVideo.play();
 
-      btnStart.disabled = true;
-      btnStop.disabled = false;
-      wsRetries = 0;
-      intentionalStop = false;
-      connectLiveWs();
-    } catch (e) {
-      showToast("Camera access denied: " + e.message, "error");
-    }
-  }
+            btnStart.disabled = true;
+            btnStop.disabled = false;
+            wsRetries = 0;
+            intentionalStop = false;
+            connectLiveWs();
+          } catch (e) {
+            showToast("Camera access denied: " + e.message, "error");
+          }
+        }
 
-  function connectLiveWs() {
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    const protocol = location.protocol === "https:" ? "wss" : "ws";
-    liveWs = new WebSocket(`${protocol}://${location.host}/video-stream`);
+        function connectLiveWs() {
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+          }
+          const protocol = location.protocol === "https:" ? "wss" : "ws";
+          liveWs = new WebSocket(`${protocol}://${location.host}/video-stream`);
 
-    liveWs.onopen = () => {
-      wsRetries = 0;
-      startCapture();
-    };
+          liveWs.onopen = () => {
+            wsRetries = 0;
+            startCapture();
+          };
 
-    liveWs.onmessage = e => {
-      const data = JSON.parse(e.data);
-      if (data.error) return;
+          liveWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.error) return;
 
-      // draw annotated frame
-      const img = new Image();
-      img.onload = () => {
-        liveCtx.clearRect(0, 0, currentQuality.width, currentQuality.height);
-        liveCtx.drawImage(img, 0, 0, currentQuality.width, currentQuality.height);
-      };
-      img.src = "data:image/jpeg;base64," + data.annotated_frame;
+            // draw annotated frame
+            const img = new Image();
+            img.onload = () => {
+              liveCtx.clearRect(
+                0,
+                0,
+                currentQuality.width,
+                currentQuality.height,
+              );
+              liveCtx.drawImage(
+                img,
+                0,
+                0,
+                currentQuality.width,
+                currentQuality.height,
+              );
+            };
+            img.src = "data:image/jpeg;base64," + data.annotated_frame;
 
-      // fps
-      document.getElementById("fps-counter").textContent = data.fps + " FPS";
+            // fps
+            document.getElementById("fps-counter").textContent =
+              data.fps + " FPS";
 
-      // update chips
-      const detected = new Set((data.boxes || [])
-        .filter(b => b.confidence >= 0.5)
-        .map(b => b.label));
-      document.querySelectorAll("#activity-chips .chip").forEach(chip => {
-        chip.classList.toggle("active", detected.has(chip.dataset.cls));
-      });
-      
-      const detectedEmployees = new Set((data.boxes || [])
-        .filter(b => b.employee_name && b.employee_name !== "Unknown")
-        .map(b => b.employee_name));
-      const empContainer = document.getElementById("active-employees-chips");
-      empContainer.innerHTML = Array.from(detectedEmployees).map(name => 
-        `<div class="chip active" style="background:rgba(34,197,94,0.1); border-color:var(--success); color:var(--success); box-shadow:none;">${name}</div>`
-      ).join("");
-    };
+            // update chips
+            const detected = new Set(
+              (data.boxes || [])
+                .filter((b) => b.confidence >= 0.5)
+                .map((b) => b.label),
+            );
+            document
+              .querySelectorAll("#activity-chips .chip")
+              .forEach((chip) => {
+                chip.classList.toggle("active", detected.has(chip.dataset.cls));
+              });
 
-    liveWs.onclose = event => {
-      if (event.target) {
-        event.target.intentionalClose = event.target.intentionalClose === true;
-      }
-      if (intentionalStop || event.target?.intentionalClose) {
-        return;
-      }
-      if (mediaStream && wsRetries < MAX_WS_RETRIES) {
-        wsRetries++;
-        const delay = Math.pow(2, wsRetries) * 500;
-        showToast(`WebSocket disconnected — retrying in ${delay/1000}s…`, "info");
-        reconnectTimeout = setTimeout(connectLiveWs, delay);
-      }
-    };
+            const detectedEmployees = new Set(
+              (data.boxes || [])
+                .filter((b) => b.employee_name && b.employee_name !== "Unknown")
+                .map((b) => b.employee_name),
+            );
+            const empContainer = document.getElementById(
+              "active-employees-chips",
+            );
+            empContainer.innerHTML = Array.from(detectedEmployees)
+              .map(
+                (name) =>
+                  `<div class="chip active" style="background:rgba(34,197,94,0.1); border-color:var(--success); color:var(--success); box-shadow:none;">${name}</div>`,
+              )
+              .join("");
+          };
 
-    liveWs.onerror = () => { liveWs.close(); };
-  }
+          liveWs.onclose = (event) => {
+            if (event.target) {
+              event.target.intentionalClose =
+                event.target.intentionalClose === true;
+            }
+            if (intentionalStop || event.target?.intentionalClose) {
+              return;
+            }
+            if (mediaStream && wsRetries < MAX_WS_RETRIES) {
+              wsRetries++;
+              const delay = Math.pow(2, wsRetries) * 500;
+              showToast(
+                `WebSocket disconnected — retrying in ${delay / 1000}s…`,
+                "info",
+              );
+              reconnectTimeout = setTimeout(connectLiveWs, delay);
+            }
+          };
 
-  function startCapture() {
-    if (captureInterval) clearInterval(captureInterval);
-    captureInterval = setInterval(() => {
-      if (!liveWs || liveWs.readyState !== WebSocket.OPEN) return;
-      hiddenCtx.drawImage(hiddenVideo, 0, 0, currentQuality.width, currentQuality.height);
-      const dataUrl = hiddenCanvas.toDataURL("image/jpeg", currentQuality.quality);
-      const b64 = dataUrl.split(",")[1];
-      liveWs.send(b64);
-    }, 120); // ~8 FPS
-  }
+          liveWs.onerror = () => {
+            liveWs.close();
+          };
+        }
 
-  function stopCamera({ intentional = true, preserveCanvas = false } = {}) {
-    intentionalStop = intentional;
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
-    if (liveWs) {
-      liveWs.intentionalClose = intentional;
-      if (intentional) wsRetries = MAX_WS_RETRIES;
-      liveWs.close();
-      liveWs = null;
-    }
-    if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
-    hiddenVideo.srcObject = null;
-    if (!preserveCanvas) {
-      liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
-      liveCtx.fillStyle = "#000";
-      liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
-    }
-    document.getElementById("fps-counter").textContent = "0 FPS";
-    btnStart.disabled = false;
-    btnStop.disabled = true;
-    document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
-  }
+        function startCapture() {
+          if (captureInterval) clearInterval(captureInterval);
+          captureInterval = setInterval(() => {
+            if (!liveWs || liveWs.readyState !== WebSocket.OPEN) return;
+            hiddenCtx.drawImage(
+              hiddenVideo,
+              0,
+              0,
+              currentQuality.width,
+              currentQuality.height,
+            );
+            const dataUrl = hiddenCanvas.toDataURL(
+              "image/jpeg",
+              currentQuality.quality,
+            );
+            const b64 = dataUrl.split(",")[1];
+            liveWs.send(b64);
+          }, 120); // ~8 FPS
+        }
 
-  // ═══════════════ ACTIVITY LOG ══════════════════════════════════
-  const logSearchInput = document.getElementById("log-search");
-  logSearchInput.addEventListener("input", e => {
-    logSearch = e.target.value.toLowerCase();
-    logPage = 1;
-    renderLog();
-  });
+        function stopCamera({
+          intentional = true,
+          preserveCanvas = false,
+        } = {}) {
+          intentionalStop = intentional;
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = null;
+          }
+          if (captureInterval) {
+            clearInterval(captureInterval);
+            captureInterval = null;
+          }
+          if (liveWs) {
+            liveWs.intentionalClose = intentional;
+            if (intentional) wsRetries = MAX_WS_RETRIES;
+            liveWs.close();
+            liveWs = null;
+          }
+          if (mediaStream) {
+            mediaStream.getTracks().forEach((t) => t.stop());
+            mediaStream = null;
+          }
+          hiddenVideo.srcObject = null;
+          if (!preserveCanvas) {
+            liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+            liveCtx.fillStyle = "#000";
+            liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
+          }
+          document.getElementById("fps-counter").textContent = "0 FPS";
+          btnStart.disabled = false;
+          btnStop.disabled = true;
+          document
+            .querySelectorAll(".chip")
+            .forEach((c) => c.classList.remove("active"));
+        }
 
-  document.querySelectorAll("#log-table th").forEach(th => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sort;
-      if (logSort.key === key) logSort.asc = !logSort.asc;
-      else { logSort.key = key; logSort.asc = true; }
-      renderLog();
-    });
-  });
+        // ═══════════════ ACTIVITY LOG ══════════════════════════════════
+        const logSearchInput = document.getElementById("log-search");
+        logSearchInput.addEventListener("input", (e) => {
+          logSearch = e.target.value.toLowerCase();
+          logPage = 1;
+          renderLog();
+        });
 
-  document.getElementById("log-prev").addEventListener("click", () => { logPage--; renderLog(); });
-  document.getElementById("log-next").addEventListener("click", () => { logPage++; renderLog(); });
+        document.querySelectorAll("#log-table th").forEach((th) => {
+          th.addEventListener("click", () => {
+            const key = th.dataset.sort;
+            if (logSort.key === key) logSort.asc = !logSort.asc;
+            else {
+              logSort.key = key;
+              logSort.asc = true;
+            }
+            renderLog();
+          });
+        });
 
-  function renderLog() {
-    let data = [...activityLog];
-    if (logSearch) {
-      data = data.filter(e =>
-        e.label.toLowerCase().includes(logSearch) ||
-        e.mode.toLowerCase().includes(logSearch) ||
-        (e.employee_name && e.employee_name.toLowerCase().includes(logSearch))
-      );
-    }
-    // sort
-    data.sort((a, b) => {
-      let va = a[logSort.key], vb = b[logSort.key];
-      if (typeof va === "string") va = va.toLowerCase();
-      if (typeof vb === "string") vb = vb.toLowerCase();
-      if (va < vb) return logSort.asc ? -1 : 1;
-      if (va > vb) return logSort.asc ? 1 : -1;
-      return 0;
-    });
+        document.getElementById("log-prev").addEventListener("click", () => {
+          logPage--;
+          renderLog();
+        });
+        document.getElementById("log-next").addEventListener("click", () => {
+          logPage++;
+          renderLog();
+        });
 
-    const totalPages = Math.max(1, Math.ceil(data.length / LOG_PER_PAGE));
-    if (logPage > totalPages) logPage = totalPages;
-    const start = (logPage - 1) * LOG_PER_PAGE;
-    const page = data.slice(start, start + LOG_PER_PAGE);
+        function renderLog() {
+          let data = [...activityLog];
+          if (logSearch) {
+            data = data.filter(
+              (e) =>
+                e.label.toLowerCase().includes(logSearch) ||
+                e.mode.toLowerCase().includes(logSearch) ||
+                (e.employee_name &&
+                  e.employee_name.toLowerCase().includes(logSearch)),
+            );
+          }
+          // sort
+          data.sort((a, b) => {
+            let va = a[logSort.key],
+              vb = b[logSort.key];
+            if (typeof va === "string") va = va.toLowerCase();
+            if (typeof vb === "string") vb = vb.toLowerCase();
+            if (va < vb) return logSort.asc ? -1 : 1;
+            if (va > vb) return logSort.asc ? 1 : -1;
+            return 0;
+          });
 
-    const tbody = document.getElementById("log-tbody");
-    tbody.innerHTML = page.map(e => {
-      const conf = (e.confidence * 100).toFixed(1);
-      const colour = conf >= 70 ? "var(--success)" : conf >= 40 ? "var(--warning)" : "var(--danger)";
-      const t = new Date(e.timestamp);
-      const ts = t.toLocaleString();
-      return `
+          const totalPages = Math.max(1, Math.ceil(data.length / LOG_PER_PAGE));
+          if (logPage > totalPages) logPage = totalPages;
+          const start = (logPage - 1) * LOG_PER_PAGE;
+          const page = data.slice(start, start + LOG_PER_PAGE);
+
+          const tbody = document.getElementById("log-tbody");
+          tbody.innerHTML = page
+            .map((e) => {
+              const conf = (e.confidence * 100).toFixed(1);
+              const colour =
+                conf >= 70
+                  ? "var(--success)"
+                  : conf >= 40
+                    ? "var(--warning)"
+                    : "var(--danger)";
+              const t = new Date(e.timestamp);
+              const ts = t.toLocaleString();
+              return `
         <tr>
           <td>${ts}</td>
-          <td><span class="badge ${e.mode === 'Live' ? 'badge-purple' : 'badge-green'}">${e.mode}</span></td>
-          <td style="color:${e.employee_name !== 'Unknown' ? 'var(--text)' : 'var(--text-muted)'}">${e.employee_name === 'Unknown' ? '—' : e.employee_name}</td>
+          <td><span class="badge ${e.mode === "Live" ? "badge-purple" : "badge-green"}">${e.mode}</span></td>
+          <td style="color:${e.employee_name !== "Unknown" ? "var(--text)" : "var(--text-muted)"}">${e.employee_name === "Unknown" ? "—" : e.employee_name}</td>
           <td style="text-transform:capitalize">${e.label.replace(/_/g, " ")}</td>
           <td>
             <div class="inline-conf">
@@ -1394,17 +2467,20 @@
           </td>
         </tr>
       `;
-    }).join("");
+            })
+            .join("");
 
-    document.getElementById("log-prev").disabled = logPage <= 1;
-    document.getElementById("log-next").disabled = logPage >= totalPages;
-    document.getElementById("log-page-info").textContent = `Page ${logPage} of ${totalPages}`;
-  }
+          document.getElementById("log-prev").disabled = logPage <= 1;
+          document.getElementById("log-next").disabled = logPage >= totalPages;
+          document.getElementById("log-page-info").textContent =
+            `Page ${logPage} of ${totalPages}`;
+        }
 
-  // ═══════════════ ALERTS ════════════════════════════════════════
-  function buildAlertConfig() {
-    const grid = document.getElementById("alert-config-grid");
-    grid.innerHTML = CLASSES.map((cls, i) => `
+        // ═══════════════ ALERTS ════════════════════════════════════════
+        function buildAlertConfig() {
+          const grid = document.getElementById("alert-config-grid");
+          grid.innerHTML = CLASSES.map(
+            (cls, i) => `
       <div class="alert-config-item">
         <div class="toggle" data-cls="${cls}" id="toggle-${cls}"></div>
         <span class="label">${cls.replace(/_/g, " ")}</span>
@@ -1412,269 +2488,739 @@
                data-cls="${cls}" id="slider-${cls}" />
         <span class="threshold-val" id="val-${cls}">70%</span>
       </div>
-    `).join("");
+    `,
+          ).join("");
 
-    // wire toggles
-    grid.querySelectorAll(".toggle").forEach(tog => {
-      tog.addEventListener("click", () => {
-        tog.classList.toggle("active");
-        saveAlertConfig();
-      });
-    });
+          // wire toggles
+          grid.querySelectorAll(".toggle").forEach((tog) => {
+            tog.addEventListener("click", () => {
+              tog.classList.toggle("active");
+              saveAlertConfig();
+            });
+          });
 
-    // wire sliders
-    grid.querySelectorAll(".threshold-slider").forEach(slider => {
-      slider.addEventListener("input", () => {
-        document.getElementById(`val-${slider.dataset.cls}`).textContent = slider.value + "%";
-      });
-      slider.addEventListener("change", saveAlertConfig);
-    });
-  }
+          // wire sliders
+          grid.querySelectorAll(".threshold-slider").forEach((slider) => {
+            slider.addEventListener("input", () => {
+              document.getElementById(`val-${slider.dataset.cls}`).textContent =
+                slider.value + "%";
+            });
+            slider.addEventListener("change", saveAlertConfig);
+          });
+        }
 
-  async function saveAlertConfig() {
-    const configs = CLASSES.map(cls => {
-      const toggle = document.getElementById(`toggle-${cls}`);
-      const slider = document.getElementById(`slider-${cls}`);
-      return {
-        label: cls,
-        enabled: toggle.classList.contains("active"),
-        threshold: parseInt(slider.value) / 100
-      };
-    });
-    try {
-      await apiFetch("/alerts/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(configs)
-      });
-    } catch { /* toast shown */ }
-  }
+        async function saveAlertConfig() {
+          const configs = CLASSES.map((cls) => {
+            const toggle = document.getElementById(`toggle-${cls}`);
+            const slider = document.getElementById(`slider-${cls}`);
+            return {
+              label: cls,
+              enabled: toggle.classList.contains("active"),
+              threshold: parseInt(slider.value) / 100,
+            };
+          });
+          try {
+            await apiFetch("/alerts/config", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(configs),
+            });
+          } catch {
+            /* toast shown */
+          }
+        }
 
-  async function fetchAlerts() {
-    try {
-      const r = await fetch("/alerts");
-      const data = await r.json();
-      if (data.length > lastAlertCount) {
-        renderAlerts(data);
-        lastAlertCount = data.length;
-      }
-    } catch { /* silent */ }
-  }
+        async function fetchAlerts() {
+          try {
+            const r = await fetch("/alerts");
+            const data = await r.json();
+            if (data.length > lastAlertCount) {
+              renderAlerts(data);
+              lastAlertCount = data.length;
+            }
+          } catch {
+            /* silent */
+          }
+        }
 
-  function renderAlerts(alerts) {
-    const feed = document.getElementById("alert-feed");
-    feed.innerHTML = alerts.slice(-30).reverse().map(a => {
-      const t = new Date(a.timestamp);
-      return `
+        function renderAlerts(alerts) {
+          const feed = document.getElementById("alert-feed");
+          feed.innerHTML = alerts
+            .slice(-30)
+            .reverse()
+            .map((a) => {
+              const t = new Date(a.timestamp);
+              return `
         <div class="alert-toast">
           <span class="alert-label">${a.label.replace(/_/g, " ")}</span>
           <span class="alert-conf">${(a.confidence * 100).toFixed(0)}%</span>
           <span class="alert-time">${t.toLocaleTimeString()}</span>
         </div>
       `;
-    }).join("");
-  }
+            })
+            .join("");
+        }
 
-  buildAlertConfig();
+        buildAlertConfig();
 
-  // ═══════════════ EMPLOYEES ═════════════════════════════════════
-  const enrollDropZone = document.getElementById("enroll-drop-zone");
-  const enrollFileInput = document.getElementById("enroll-file-input");
-  const btnEnroll = document.getElementById("btn-enroll");
-  let enrollFiles = [];
+        // ═══════════════ EMPLOYEES ═════════════════════════════════════
+        const enrollDropZone = document.getElementById("enroll-drop-zone");
+        const enrollFileInput = document.getElementById("enroll-file-input");
+        const btnEnroll = document.getElementById("btn-enroll");
+        const btnResetEnrollment = document.getElementById(
+          "btn-reset-enrollment",
+        );
+        const enrollIdInput = document.getElementById("enroll-id");
+        const enrollNameInput = document.getElementById("enroll-name");
+        const enrollStatusMessage = document.getElementById(
+          "enroll-status-message",
+        );
+        const enrollIdHint = document.getElementById("enroll-id-hint");
+        const enrollWarningBanner = document.getElementById(
+          "enroll-warning-banner",
+        );
+        const qualityStrip = document.getElementById(
+          "enrollment-quality-strip",
+        );
+        const employeeSearchInput = document.getElementById("employee-search");
+        const webcamModeBtn = document.getElementById("mode-webcam");
+        const uploadModeBtn = document.getElementById("mode-upload");
+        const uploadPanel = document.getElementById("upload-enrollment-panel");
+        const webcamPanel = document.getElementById("webcam-enrollment-panel");
+        const enrollWebcamVideo = document.getElementById(
+          "enroll-webcam-video",
+        );
+        const enrollWebcamCanvas = document.getElementById(
+          "enroll-webcam-canvas",
+        );
+        const enrollWebcamCtx = enrollWebcamCanvas.getContext("2d");
+        const btnStartEnrollCamera = document.getElementById(
+          "btn-start-enroll-camera",
+        );
+        const btnCaptureEnrollPhoto = document.getElementById(
+          "btn-capture-enroll-photo",
+        );
+        const btnRetakeEnrollPhoto = document.getElementById(
+          "btn-retake-enroll-photo",
+        );
+        const webcamCaptureGrid = document.getElementById(
+          "webcam-capture-grid",
+        );
+        const webcamEmptyState = document.getElementById("webcam-empty-state");
+        const webcamHint = document.getElementById("webcam-hint");
 
-  enrollDropZone.addEventListener("click", () => enrollFileInput.click());
-  enrollDropZone.addEventListener("dragover", e => { e.preventDefault(); enrollDropZone.classList.add("dragover"); });
-  enrollDropZone.addEventListener("dragleave", () => enrollDropZone.classList.remove("dragover"));
-  enrollDropZone.addEventListener("drop", e => {
-    e.preventDefault();
-    enrollDropZone.classList.remove("dragover");
-    if (e.dataTransfer.files.length) handleEnrollFiles(e.dataTransfer.files);
-  });
-  enrollFileInput.addEventListener("change", () => {
-    if (enrollFileInput.files.length) handleEnrollFiles(enrollFileInput.files);
-  });
+        let employeesList = [];
+        let filteredEmployees = [];
+        let employeeSearch = "";
+        let suggestedEmployeeId = "EMP001";
+        let enrollFiles = [];
+        let enrollPhotoDiagnostics = [];
+        let enrollmentMode = "upload";
+        let enrollCameraStream = null;
+        let enrollCapturedPhotos = [];
+        let enrollmentBusy = false;
 
-  function handleEnrollFiles(files) {
-    enrollFiles = Array.from(files);
-    const nameEl = document.getElementById("enroll-filename");
-    const previewEl = document.getElementById("enroll-preview");
-    
-    if (enrollFiles.length === 1) {
-      nameEl.textContent = enrollFiles[0].name;
-      const reader = new FileReader();
-      reader.onload = e => {
-        previewEl.src = e.target.result;
-        previewEl.style.display = "block";
-      };
-      reader.readAsDataURL(enrollFiles[0]);
-    } else {
-      nameEl.textContent = `${enrollFiles.length} photos selected`;
-      previewEl.style.display = "none";
-    }
-  }
+        function slugEmployeeId(value) {
+          return value.trim().toUpperCase().replace(/\s+/g, "");
+        }
 
-  btnEnroll.addEventListener("click", async () => {
-    const empId = document.getElementById("enroll-id").value.trim();
-    const empName = document.getElementById("enroll-name").value.trim();
-    
-    if (!empId || !empName) {
-      showToast("Employee ID and Name are required.", "error");
-      return;
-    }
-    if (enrollFiles.length === 0) {
-      showToast("Please select at least one photo.", "error");
-      return;
-    }
+        function formatEnrollmentDate(value) {
+          if (!value) return "Just now";
+          const date = new Date(value);
+          return Number.isNaN(date.getTime())
+            ? "Just now"
+            : date.toLocaleDateString();
+        }
 
-    const form = new FormData();
-    form.append("employee_id", empId);
-    form.append("name", empName);
-    
-    try {
-      btnEnroll.disabled = true;
-      if (enrollFiles.length === 1) {
-        form.append("photo", enrollFiles[0]);
-        const r = await apiFetch("/employees/enroll", { method: "POST", body: form });
-        const res = await r.json();
-        showToast(`Enrolled ${res.name} successfully.`, "success");
-      } else {
-        enrollFiles.forEach(f => form.append("photos", f));
-        const r = await apiFetch("/employees/enroll/batch", { method: "POST", body: form });
-        const res = await r.json();
-        showToast(`Enrolled ${res.name}: ${res.enrolled} photos added, ${res.skipped} skipped.`, "success");
-      }
-      
-      // Reset form
-      document.getElementById("enroll-id").value = "";
-      document.getElementById("enroll-name").value = "";
-      enrollFiles = [];
-      document.getElementById("enroll-filename").textContent = "";
-      document.getElementById("enroll-preview").style.display = "none";
-      enrollFileInput.value = "";
-      
-      fetchEmployees();
-    } catch (e) {
-      // Error handled in apiFetch, except maybe 400 with detail
-      console.error(e);
-    } finally {
-      btnEnroll.disabled = false;
-    }
-  });
+        function getCurrentEnrollmentFiles() {
+          return enrollmentMode === "webcam"
+            ? enrollCapturedPhotos.map((item) => item.file)
+            : enrollFiles;
+        }
 
-  let employeesList = [];
-  
-  async function fetchEmployees() {
-    try {
-      const r = await fetch("/employees");
-      employeesList = await r.json();
-      renderEmployees();
-    } catch { /* silent */ }
-  }
-  
-  function renderEmployees() {
-    const grid = document.getElementById("employees-grid");
-    if (!employeesList.length) {
-      grid.innerHTML = '<p style="color:var(--text-muted);font-size:0.88rem;">No employees enrolled yet.</p>';
-      return;
-    }
-    grid.innerHTML = employeesList.map(emp => {
-      const initials = emp.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
-      return `
-        <div class="card" style="position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; padding: 20px 16px;">
-          <button class="btn-delete-emp" data-id="${emp.employee_id}" style="position:absolute; top:8px; right:8px; background:transparent; border:none; color:var(--danger); cursor:pointer;" title="Delete Employee">
+        function getDuplicateEmployee() {
+          const empId = slugEmployeeId(enrollIdInput.value);
+          return (
+            employeesList.find(
+              (emp) => emp.employee_id.toUpperCase() === empId,
+            ) || null
+          );
+        }
+
+        function generateSuggestedEmployeeId() {
+          const numbers = employeesList
+            .map((emp) => {
+              const match = String(emp.employee_id || "")
+                .toUpperCase()
+                .match(/^EMP(\d+)$/);
+              return match ? parseInt(match[1], 10) : null;
+            })
+            .filter((num) => Number.isInteger(num));
+          const nextNumber = numbers.length ? Math.max(...numbers) + 1 : 1;
+          return `EMP${String(nextNumber).padStart(3, "0")}`;
+        }
+
+        function refreshSuggestedEmployeeId(force = false) {
+          suggestedEmployeeId = generateSuggestedEmployeeId();
+          if (force || !enrollIdInput.value.trim())
+            enrollIdInput.value = suggestedEmployeeId;
+          updateEnrollmentHints();
+        }
+
+        function updateEmployeeStats() {
+          const totalEmployees = employeesList.length;
+          const totalEmbeddings = employeesList.reduce(
+            (sum, emp) => sum + (emp.embedding_count || 0),
+            0,
+          );
+          const avgPhotos = totalEmployees
+            ? (totalEmbeddings / totalEmployees).toFixed(1)
+            : "0.0";
+          document.getElementById("employees-total").textContent =
+            totalEmployees;
+          document.getElementById("employees-embeddings").textContent =
+            totalEmbeddings;
+          document.getElementById("employees-average").textContent = avgPhotos;
+        }
+
+        function renderEmployeeQuality() {
+          const files = getCurrentEnrollmentFiles();
+          const faceDetectedCount = enrollPhotoDiagnostics.filter(
+            (item) => item.valid_image && item.face_detected,
+          ).length;
+          const noFaceCount = enrollPhotoDiagnostics.filter(
+            (item) => item.valid_image && !item.face_detected,
+          ).length;
+          const invalidCount = enrollPhotoDiagnostics.filter(
+            (item) => !item.valid_image,
+          ).length;
+          const fewerThanThree = files.length > 0 && files.length < 3;
+
+          qualityStrip.innerHTML = `
+      <div class="quality-pill ${files.length >= 3 ? "good" : "warn"}">Photos selected: <strong>${files.length}</strong></div>
+      <div class="quality-pill ${faceDetectedCount > 0 ? "good" : "warn"}">Face detected: <strong>${faceDetectedCount}</strong></div>
+      <div class="quality-pill ${noFaceCount ? "bad" : "good"}">No face found: <strong>${noFaceCount}</strong></div>
+      <div class="quality-pill ${invalidCount ? "bad" : "good"}">Invalid images: <strong>${invalidCount}</strong></div>
+    `;
+
+          const messages = [];
+          if (!files.length)
+            messages.push("Add at least one photo to continue.");
+          if (fewerThanThree)
+            messages.push(
+              "Fewer than 3 photos provided — 3 to 5 angles usually improves recognition.",
+            );
+          if (noFaceCount)
+            messages.push(`${noFaceCount} photo(s) have no detectable face.`);
+          if (invalidCount)
+            messages.push(
+              `${invalidCount} file(s) could not be read as images.`,
+            );
+          enrollWarningBanner.textContent = messages.join(" ");
+          enrollWarningBanner.className = `field-hint${messages.length ? " warning" : " success"}`;
+          if (!messages.length && files.length) {
+            enrollWarningBanner.textContent =
+              "Enrollment set looks good for a polished demo.";
+          }
+        }
+
+        async function inspectEnrollmentPhotos(files) {
+          if (!files.length) {
+            enrollPhotoDiagnostics = [];
+            renderEmployeeQuality();
+            return;
+          }
+          const form = new FormData();
+          files.forEach((file) => form.append("photos", file));
+          try {
+            const r = await apiFetch("/employees/validate-photos", {
+              method: "POST",
+              body: form,
+            });
+            const data = await r.json();
+            enrollPhotoDiagnostics = data.results || [];
+          } catch {
+            enrollPhotoDiagnostics = files.map((file) => ({
+              filename: file.name,
+              valid_image: true,
+              face_detected: false,
+              face_count: 0,
+            }));
+          }
+          renderEnrollmentPreview();
+          renderEmployeeQuality();
+        }
+
+        function renderEnrollmentPreview() {
+          const files = getCurrentEnrollmentFiles();
+          const diagnosticsByName = new Map(
+            enrollPhotoDiagnostics.map((item) => [item.filename, item]),
+          );
+          const targetGrid =
+            enrollmentMode === "webcam" ? webcamCaptureGrid : null;
+
+          if (targetGrid) {
+            targetGrid.innerHTML = enrollCapturedPhotos
+              .map((item, index) => {
+                const diag = diagnosticsByName.get(item.file.name) || {};
+                const faceLabel = !diag.valid_image
+                  ? "Invalid image"
+                  : diag.face_detected
+                    ? `${diag.face_count || 1} face detected`
+                    : "No face detected";
+                return `
+          <div class="thumb-card">
+            <button class="thumb-remove" type="button" data-remove-capture="${index}">×</button>
+            <img src="${item.preview}" alt="Captured photo ${index + 1}">
+            <div class="thumb-meta">
+              <span>${item.file.name}</span>
+              <span>${faceLabel}</span>
+            </div>
+          </div>
+        `;
+              })
+              .join("");
+            webcamEmptyState.style.display = enrollCapturedPhotos.length
+              ? "none"
+              : "block";
+            document
+              .querySelectorAll("[data-remove-capture]")
+              .forEach((btn) => {
+                btn.addEventListener("click", () =>
+                  removeCapturedPhoto(parseInt(btn.dataset.removeCapture, 10)),
+                );
+              });
+          }
+
+          const fileLabel = document.getElementById("enroll-filename");
+          if (enrollmentMode === "upload") {
+            fileLabel.textContent = files.length
+              ? `${files.length} photo${files.length === 1 ? "" : "s"} selected`
+              : "";
+          }
+        }
+
+        function updateEnrollmentHints() {
+          const duplicate = getDuplicateEmployee();
+          if (duplicate) {
+            enrollIdHint.textContent = `ID already exists for ${duplicate.name}. New photos will be added to this employee.`;
+            enrollIdHint.className = "field-hint warning";
+          } else {
+            enrollIdHint.textContent = `Suggested next ID: ${suggestedEmployeeId}. You can edit it.`;
+            enrollIdHint.className = "field-hint";
+          }
+
+          if (!enrollNameInput.value.trim()) {
+            document.getElementById("enroll-name-hint").textContent =
+              "Enter a clear display name for the employee card and live feed.";
+            document.getElementById("enroll-name-hint").className =
+              "field-hint";
+          } else {
+            document.getElementById("enroll-name-hint").textContent =
+              "Looks good.";
+            document.getElementById("enroll-name-hint").className =
+              "field-hint success";
+          }
+        }
+
+        function setEnrollmentMode(mode) {
+          enrollmentMode = mode;
+          uploadModeBtn.classList.toggle("active", mode === "upload");
+          webcamModeBtn.classList.toggle("active", mode === "webcam");
+          uploadPanel.classList.toggle("active", mode === "upload");
+          webcamPanel.classList.toggle("active", mode === "webcam");
+          if (mode !== "webcam") stopEnrollCamera();
+          renderEnrollmentPreview();
+          renderEmployeeQuality();
+        }
+
+        function setEnrollmentBusyState(isBusy, label = "Enroll Employee") {
+          enrollmentBusy = isBusy;
+          btnEnroll.disabled = isBusy;
+          btnResetEnrollment.disabled = isBusy;
+          enrollFileInput.disabled = isBusy;
+          enrollIdInput.disabled = isBusy;
+          enrollNameInput.disabled = isBusy;
+          btnEnroll.innerHTML = isBusy ? `${label}…` : "Enroll Employee";
+        }
+
+        function resetEnrollmentForm({ preserveName = false } = {}) {
+          enrollCapturedPhotos.forEach((item) => {
+            if (item?.preview) URL.revokeObjectURL(item.preview);
+          });
+          enrollFiles = [];
+          enrollCapturedPhotos = [];
+          enrollPhotoDiagnostics = [];
+          enrollFileInput.value = "";
+          if (!preserveName) enrollNameInput.value = "";
+          enrollStatusMessage.textContent =
+            "";
+          document.getElementById("enroll-filename").textContent = "";
+          webcamCaptureGrid.innerHTML = "";
+          webcamEmptyState.style.display = "block";
+          webcamHint.textContent =
+            "Capture 3–5 photos from slightly different angles.";
+          btnRetakeEnrollPhoto.disabled = true;
+          refreshSuggestedEmployeeId(true);
+          renderEmployeeQuality();
+          renderEnrollmentPreview();
+          updateEnrollmentHints();
+        }
+
+        async function startEnrollCamera() {
+          try {
+            if (enrollCameraStream) stopEnrollCamera();
+            enrollCameraStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: "user", width: 640, height: 480 },
+            });
+            enrollWebcamVideo.srcObject = enrollCameraStream;
+            await enrollWebcamVideo.play();
+            btnCaptureEnrollPhoto.disabled = false;
+            webcamHint.textContent =
+              "Camera is live — capture a few different angles.";
+            showToast("Enrollment camera ready.", "success");
+          } catch (e) {
+            webcamHint.textContent = `Camera unavailable: ${e.message}`;
+            showToast("Camera access denied for enrollment.", "error");
+          }
+        }
+
+        function stopEnrollCamera() {
+          if (enrollCameraStream) {
+            enrollCameraStream.getTracks().forEach((track) => track.stop());
+            enrollCameraStream = null;
+          }
+          enrollWebcamVideo.srcObject = null;
+          btnCaptureEnrollPhoto.disabled = true;
+        }
+
+        async function captureEnrollPhoto() {
+          if (!enrollCameraStream) return;
+          enrollWebcamCtx.drawImage(
+            enrollWebcamVideo,
+            0,
+            0,
+            enrollWebcamCanvas.width,
+            enrollWebcamCanvas.height,
+          );
+          const blob = await new Promise((resolve) =>
+            enrollWebcamCanvas.toBlob(resolve, "image/jpeg", 0.92),
+          );
+          if (!blob) return;
+          const file = new File([blob], `capture_${Date.now()}.jpg`, {
+            type: "image/jpeg",
+          });
+          const preview = URL.createObjectURL(blob);
+          enrollCapturedPhotos.push({ file, preview });
+          btnRetakeEnrollPhoto.disabled = false;
+          webcamHint.textContent = `${enrollCapturedPhotos.length} capture${enrollCapturedPhotos.length === 1 ? "" : "s"} ready.`;
+          await inspectEnrollmentPhotos(getCurrentEnrollmentFiles());
+        }
+
+        function removeCapturedPhoto(index) {
+          const removed = enrollCapturedPhotos.splice(index, 1)[0];
+          if (removed?.preview) URL.revokeObjectURL(removed.preview);
+          btnRetakeEnrollPhoto.disabled = enrollCapturedPhotos.length === 0;
+          webcamHint.textContent = enrollCapturedPhotos.length
+            ? `${enrollCapturedPhotos.length} capture${enrollCapturedPhotos.length === 1 ? "" : "s"} ready.`
+            : "Capture 3–5 photos from slightly different angles.";
+          inspectEnrollmentPhotos(getCurrentEnrollmentFiles());
+        }
+
+        function validateEnrollmentForm() {
+          const empId = slugEmployeeId(enrollIdInput.value);
+          const empName = enrollNameInput.value.trim();
+          const files = getCurrentEnrollmentFiles();
+          if (!empId) {
+            enrollStatusMessage.textContent = "Employee ID is required.";
+            enrollStatusMessage.className = "field-hint error";
+            return null;
+          }
+          if (!/^EMP\d{3,}$/.test(empId)) {
+            enrollStatusMessage.textContent = "Use IDs like EMP001 or EMP123.";
+            enrollStatusMessage.className = "field-hint error";
+            return null;
+          }
+          if (!empName) {
+            enrollStatusMessage.textContent = "Employee name is required.";
+            enrollStatusMessage.className = "field-hint error";
+            return null;
+          }
+          if (!files.length) {
+            enrollStatusMessage.textContent =
+              enrollmentMode === "webcam"
+                ? "Capture at least one photo before enrolling."
+                : "Select at least one photo before enrolling.";
+            enrollStatusMessage.className = "field-hint error";
+            return null;
+          }
+          enrollStatusMessage.textContent = "Enrollment ready.";
+          enrollStatusMessage.className = "field-hint success";
+          return { empId, empName, files };
+        }
+
+        async function submitEnrollment() {
+          const payload = validateEnrollmentForm();
+          if (!payload) {
+            showToast(enrollStatusMessage.textContent, "error");
+            return;
+          }
+
+          const { empId, empName, files } = payload;
+          const duplicate = employeesList.find(
+            (emp) => emp.employee_id.toUpperCase() === empId,
+          );
+          const form = new FormData();
+          form.append("employee_id", empId);
+          form.append("name", empName);
+
+          try {
+            setEnrollmentBusyState(
+              true,
+              files.length > 1 ? "Enrolling Photos" : "Enrolling Employee",
+            );
+            if (files.length === 1) {
+              form.append("photo", files[0]);
+              const r = await apiFetch("/employees/enroll", {
+                method: "POST",
+                body: form,
+              });
+              const res = await r.json();
+              showToast(`Enrolled ${res.name} successfully.`, "success");
+            } else {
+              files.forEach((file) => form.append("photos", file));
+              const r = await apiFetch("/employees/enroll/batch", {
+                method: "POST",
+                body: form,
+              });
+              const res = await r.json();
+              if (res.enrolled === 0) {
+                throw new Error(
+                  "No usable faces were found in the selected photos.",
+                );
+              }
+              showToast(
+                duplicate
+                  ? `Updated ${res.name}: ${res.enrolled} photos added, ${res.skipped} skipped.`
+                  : `Enrolled ${res.name}: ${res.enrolled} photos added, ${res.skipped} skipped.`,
+                "success",
+              );
+            }
+            resetEnrollmentForm();
+            await fetchEmployees();
+            enrollStatusMessage.textContent = duplicate
+              ? `Updated ${empName} successfully.`
+              : `Added ${empName} successfully.`;
+            enrollStatusMessage.className = "field-hint success";
+          } catch (e) {
+            enrollStatusMessage.textContent = e.message;
+            enrollStatusMessage.className = "field-hint error";
+          } finally {
+            setEnrollmentBusyState(false);
+          }
+        }
+
+        enrollDropZone.addEventListener("click", () => enrollFileInput.click());
+        enrollDropZone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          enrollDropZone.classList.add("dragover");
+        });
+        enrollDropZone.addEventListener("dragleave", () =>
+          enrollDropZone.classList.remove("dragover"),
+        );
+        enrollDropZone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          enrollDropZone.classList.remove("dragover");
+          if (e.dataTransfer.files.length) {
+            enrollFiles = Array.from(e.dataTransfer.files);
+            inspectEnrollmentPhotos(enrollFiles);
+          }
+        });
+        enrollFileInput.addEventListener("change", () => {
+          enrollFiles = Array.from(enrollFileInput.files || []);
+          inspectEnrollmentPhotos(enrollFiles);
+        });
+        uploadModeBtn.addEventListener("click", () =>
+          setEnrollmentMode("upload"),
+        );
+        webcamModeBtn.addEventListener("click", () =>
+          setEnrollmentMode("webcam"),
+        );
+        btnStartEnrollCamera.addEventListener("click", startEnrollCamera);
+        btnCaptureEnrollPhoto.addEventListener("click", captureEnrollPhoto);
+        btnRetakeEnrollPhoto.addEventListener("click", () => {
+          if (enrollCapturedPhotos.length)
+            removeCapturedPhoto(enrollCapturedPhotos.length - 1);
+        });
+        btnResetEnrollment.addEventListener("click", () =>
+          resetEnrollmentForm(),
+        );
+        btnEnroll.addEventListener("click", submitEnrollment);
+        enrollIdInput.addEventListener("input", () => {
+          enrollIdInput.value = slugEmployeeId(enrollIdInput.value);
+          updateEnrollmentHints();
+        });
+        enrollNameInput.addEventListener("input", updateEnrollmentHints);
+        employeeSearchInput.addEventListener("input", (e) => {
+          employeeSearch = e.target.value.toLowerCase();
+          renderEmployees();
+        });
+
+        async function fetchEmployees() {
+          try {
+            const r = await fetch("/employees");
+            employeesList = await r.json();
+            refreshSuggestedEmployeeId(
+              !enrollIdInput.value.trim() ||
+                enrollIdInput.value === suggestedEmployeeId,
+            );
+            updateEmployeeStats();
+            renderEmployees();
+            updateEnrollmentHints();
+          } catch {
+            document.getElementById("employees-grid").innerHTML =
+              '<div class="employee-empty">Unable to load employees right now.</div>';
+          }
+        }
+
+        function renderEmployees() {
+          const grid = document.getElementById("employees-grid");
+          filteredEmployees = employeesList.filter((emp) => {
+            if (!employeeSearch) return true;
+            return (
+              emp.name.toLowerCase().includes(employeeSearch) ||
+              emp.employee_id.toLowerCase().includes(employeeSearch)
+            );
+          });
+
+          if (!filteredEmployees.length) {
+            grid.innerHTML = `<div class="employee-empty">${employeesList.length ? "No employees match your search." : "No employees enrolled yet."}</div>`;
+            return;
+          }
+
+          grid.innerHTML = filteredEmployees
+            .map((emp) => {
+              const initials = emp.name
+                .split(" ")
+                .map((n) => n[0])
+                .join("")
+                .substring(0, 2)
+                .toUpperCase();
+              return `
+        <div class="card employee-card">
+          <button class="btn-delete-emp" data-id="${emp.employee_id}" style="position:absolute; top:10px; right:10px; background:transparent; border:none; color:var(--danger); cursor:pointer;" title="Delete Employee">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
-          <img src="/employees/${emp.employee_id}/preview" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="width:60px; height:60px; border-radius:50%; object-fit:cover; margin-bottom:12px;">
-          <div style="display:none; width:60px; height:60px; border-radius:50%; background:var(--surface-alt); align-items:center; justify-content:center; margin-bottom:12px; font-weight:bold; color:var(--text-muted); border: 1px solid var(--border)">
-            ${initials}
+          <div class="employee-card-head">
+            <img class="employee-avatar" src="/employees/${emp.employee_id}/preview" alt="${emp.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="employee-avatar-fallback">${initials}</div>
+            <div>
+              <h4>${emp.name}</h4>
+              <div class="employee-subtle">${emp.employee_id}</div>
+            </div>
           </div>
-          <div style="font-weight:700; font-size:0.95rem; margin-bottom:2px;">${emp.name}</div>
-          <div style="color:var(--text-muted); font-size:0.78rem; margin-bottom:12px;">${emp.employee_id}</div>
-          <span class="badge badge-purple">${emp.embedding_count} photos enrolled</span>
+          <div class="employee-meta-list">
+            <div><strong>Photos:</strong> ${emp.embedding_count}</div>
+            <div><strong>Enrolled:</strong> ${formatEnrollmentDate(emp.enrolled_at)}</div>
+          </div>
+          <span class="badge badge-purple">${emp.embedding_count} photo${emp.embedding_count === 1 ? "" : "s"} enrolled</span>
         </div>
       `;
-    }).join("");
-    
-    // Bind delete buttons
-    document.querySelectorAll('.btn-delete-emp').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        if(confirm(`Are you sure you want to delete employee ${id}?`)) {
-          const card = btn.closest('.card');
-          card.style.opacity = '0';
-          setTimeout(() => card.remove(), 300);
-          try {
-            await apiFetch(`/employees/${id}`, { method: 'DELETE' });
-            showToast('Employee deleted successfully', 'success');
-            fetchEmployees();
-          } catch {}
+            })
+            .join("");
+
+          document.querySelectorAll(".btn-delete-emp").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+              const id = btn.dataset.id;
+              if (!confirm(`Are you sure you want to delete employee ${id}?`))
+                return;
+              try {
+                await apiFetch(`/employees/${id}`, { method: "DELETE" });
+                showToast("Employee deleted successfully", "success");
+                await fetchEmployees();
+                refreshSuggestedEmployeeId(true);
+              } catch {}
+            });
+          });
         }
-      });
-    });
-  }
 
-  // ═══════════════ EXPORT ════════════════════════════════════════
-  document.getElementById("btn-export-csv").addEventListener("click", () => {
-    window.location.href = "/export/csv";
-  });
+        // ═══════════════ EXPORT ════════════════════════════════════════
+        document
+          .getElementById("btn-export-csv")
+          .addEventListener("click", () => {
+            window.location.href = "/export/csv";
+          });
 
-  document.getElementById("btn-export-video").addEventListener("click", () => {
-    if (currentJobId) {
-      const a = document.createElement("a");
-      a.href = `/video-result/${currentJobId}`;
-      a.download = `annotated_${currentJobId}.mp4`;
-      a.click();
-    }
-  });
+        document
+          .getElementById("btn-export-video")
+          .addEventListener("click", () => {
+            if (currentJobId) {
+              const a = document.createElement("a");
+              a.href = `/video-result/${currentJobId}`;
+              a.download = `annotated_${currentJobId}.mp4`;
+              a.click();
+            }
+          });
 
-  function updateExportSummary() {
-    document.getElementById("export-total").textContent = activityLog.length;
-    const dur = Math.floor((Date.now() - sessionStart) / 1000);
-    const m = Math.floor(dur / 60);
-    const s = dur % 60;
-    document.getElementById("export-duration").textContent = `${m}m ${s}s`;
-    // most active — find the hour with most detections
-    if (activityLog.length > 0) {
-      const hourCounts = {};
-      activityLog.forEach(e => {
-        const h = new Date(e.timestamp).getHours();
-        hourCounts[h] = (hourCounts[h] || 0) + 1;
-      });
-      const topHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0][0];
-      document.getElementById("export-active").textContent = `${topHour}:00 – ${(parseInt(topHour)+1)%24}:00`;
-    }
-  }
+        function updateExportSummary() {
+          document.getElementById("export-total").textContent =
+            activityLog.length;
+          const dur = Math.floor((Date.now() - sessionStart) / 1000);
+          const m = Math.floor(dur / 60);
+          const s = dur % 60;
+          document.getElementById("export-duration").textContent =
+            `${m}m ${s}s`;
+          // most active — find the hour with most detections
+          if (activityLog.length > 0) {
+            const hourCounts = {};
+            activityLog.forEach((e) => {
+              const h = new Date(e.timestamp).getHours();
+              hourCounts[h] = (hourCounts[h] || 0) + 1;
+            });
+            const topHour = Object.entries(hourCounts).sort(
+              (a, b) => b[1] - a[1],
+            )[0][0];
+            document.getElementById("export-active").textContent =
+              `${topHour}:00 – ${(parseInt(topHour) + 1) % 24}:00`;
+          }
+        }
 
-  // ═══════════════ POLLING LOOP ══════════════════════════════════
-  async function fetchLog() {
-    try {
-      const r = await fetch("/activity-log");
-      activityLog = await r.json();
-      renderLog();
-      updateDashboard();
-      updateExportSummary();
-    } catch { /* silent */ }
-  }
+        // ═══════════════ POLLING LOOP ══════════════════════════════════
+        async function fetchLog() {
+          try {
+            const r = await fetch("/activity-log");
+            activityLog = await r.json();
+            renderLog();
+            updateDashboard();
+            updateExportSummary();
+          } catch {
+            /* silent */
+          }
+        }
 
-  async function fetchPerfStats() {
-    try {
-      const r = await fetch("/perf-stats");
-      const data = await r.json();
-      document.getElementById("perf-badge").textContent = `Avg Inference: ${data.avg_inference_ms} ms`;
-    } catch { /* silent */ }
-  }
+        async function fetchPerfStats() {
+          try {
+            const r = await fetch("/perf-stats");
+            const data = await r.json();
+            document.getElementById("perf-badge").textContent =
+              `Avg Inference: ${data.avg_inference_ms} ms`;
+          } catch {
+            /* silent */
+          }
+        }
 
-  setInterval(fetchLog, 5000);
-  setInterval(fetchAlerts, 5000);
-  setInterval(fetchEmployees, 30000);
-  setInterval(fetchPerfStats, 10000);
-  fetchLog();
-  fetchEmployees();
-  fetchPerfStats();
+        setInterval(fetchLog, 5000);
+        setInterval(fetchAlerts, 5000);
+        setInterval(fetchEmployees, 30000);
+        setInterval(fetchPerfStats, 10000);
+        fetchLog();
+        resetEnrollmentForm();
+        setEnrollmentMode("upload");
+        fetchEmployees();
+        fetchPerfStats();
 
-})();
-</script>
-
-</body>
+        window.addEventListener("beforeunload", stopEnrollCamera);
+      })();
+    </script>
+  </body>
 </html>

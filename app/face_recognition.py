@@ -1,4 +1,6 @@
 import json
+import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -9,6 +11,7 @@ import torch
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
 EMBEDDINGS_PATH = MODEL_DIR / "employee_embeddings.json"
+logger = logging.getLogger(__name__)
 
 class FaceRecognizer:
     def __init__(self):
@@ -28,18 +31,69 @@ class FaceRecognizer:
         self._load_embeddings()
 
     def _load_embeddings(self):
-        if EMBEDDINGS_PATH.exists():
-            with open(EMBEDDINGS_PATH, "r") as f:
-                self.employee_data = json.load(f)
-            print(f"[FaceRecognizer] Loaded {len(self.employee_data)} employees from {EMBEDDINGS_PATH}")
-        else:
+        self.employee_data = {}
+
+        if not EMBEDDINGS_PATH.exists():
+            logger.info("[FaceRecognizer] Embeddings file missing: %s. Starting with empty employee database.", EMBEDDINGS_PATH)
+            return
+
+        try:
+            if EMBEDDINGS_PATH.stat().st_size == 0:
+                logger.warning("[FaceRecognizer] Embeddings file empty: %s. Starting with empty employee database.", EMBEDDINGS_PATH)
+                return
+
+            with open(EMBEDDINGS_PATH, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+
+            if not isinstance(loaded, dict):
+                logger.warning(
+                    "[FaceRecognizer] Embeddings file invalid structure: %s. Expected object, got %s. Starting empty.",
+                    EMBEDDINGS_PATH,
+                    type(loaded).__name__,
+                )
+                return
+
+            self.employee_data = loaded
+            logger.info(
+                "[FaceRecognizer] Embeddings file loaded successfully: %s (%s employees)",
+                EMBEDDINGS_PATH,
+                len(self.employee_data),
+            )
+        except json.JSONDecodeError:
+            logger.warning(
+                "[FaceRecognizer] Embeddings file invalid JSON: %s. Starting with empty employee database.",
+                EMBEDDINGS_PATH,
+                exc_info=True,
+            )
             self.employee_data = {}
-            print("[FaceRecognizer] No existing embeddings found. Starting fresh.")
+        except OSError:
+            logger.warning(
+                "[FaceRecognizer] Failed to read embeddings file: %s. Starting with empty employee database.",
+                EMBEDDINGS_PATH,
+                exc_info=True,
+            )
+            self.employee_data = {}
 
     def _save_embeddings(self):
         MODEL_DIR.mkdir(parents=True, exist_ok=True)
-        with open(EMBEDDINGS_PATH, "w") as f:
-            json.dump(self.employee_data, f, indent=2)
+        tmp_path = EMBEDDINGS_PATH.with_suffix(f"{EMBEDDINGS_PATH.suffix}.tmp")
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(self.employee_data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, EMBEDDINGS_PATH)
+            logger.info(
+                "[FaceRecognizer] Saved embeddings atomically: %s (%s employees)",
+                EMBEDDINGS_PATH,
+                len(self.employee_data),
+            )
+        finally:
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
 
     def _cosine_similarity(self, a: np.ndarray, b: np.ndarray) -> float:
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
@@ -132,6 +186,16 @@ class FaceRecognizer:
                 "name": "Unknown",
                 "similarity": 0.0
             }
+
+    def inspect_image(self, image_bgr: np.ndarray) -> dict:
+        """Return lightweight face-detection diagnostics for enrollment previews."""
+        if image_bgr is None or image_bgr.size == 0:
+            return {"face_detected": False, "face_count": 0}
+        faces = self.app.get(image_bgr)
+        return {
+            "face_detected": bool(faces),
+            "face_count": len(faces),
+        }
 
     def get_all_employees(self) -> list:
         employees = []
