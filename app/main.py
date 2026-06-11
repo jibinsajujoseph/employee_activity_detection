@@ -7,6 +7,7 @@ import base64
 import collections
 import csv
 import io
+import logging
 import os
 import time
 import uuid
@@ -32,7 +33,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import HTMLResponse
 
-from .inference import get_detector
+from .inference import create_detector, get_detector
 from .face_recognition import get_face_recognizer
 
 # ── paths ────────────────────────────────────────────────────────────────
@@ -56,6 +57,7 @@ MAX_LOG = 5000
 # ── performance stats ───────────────────────────────────────────────────
 recent_inference_times = collections.deque(maxlen=100)
 frames_processed = 0
+logger = logging.getLogger(__name__)
 
 # ── app ──────────────────────────────────────────────────────────────────
 app = FastAPI(title="ActivityWatch — Employee Activity Detection")
@@ -102,86 +104,176 @@ def _check_alerts(entry: Dict):
 # ── background video processing ──────────────────────────────────────────
 def _process_video(job_id: str, input_path: str):
     """Process an uploaded video frame-by-frame (runs in background thread)."""
-    detector = get_detector()
-    detector.reset_cache()
-    cap = cv2.VideoCapture(input_path)
-    if not cap.isOpened():
-        video_jobs[job_id]["status"] = "error"
-        return
-
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
+    detector = create_detector()
+    cap = None
+    writer = None
     raw_output_path = str(OUTPUT_DIR / f"{job_id}_raw.mp4")
     output_path = str(OUTPUT_DIR / f"{job_id}.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(raw_output_path, fourcc, fps, (w, h))
-
-    process_every_n_frames = max(1, round(fps / 10))
-    last_annotated_frame = None
-
+    process_started_at = time.time()
     frame_idx = 0
+    total_frames = 1
     job_detections: List[Dict] = []
-    
-    global frames_processed
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-            
-        if frame_idx % process_every_n_frames == 0:
-            t0 = time.time()
-            annotated, dets = detector.detect_frame(frame)
-            elapsed_ms = (time.time() - t0) * 1000.0
-            recent_inference_times.append(elapsed_ms)
-            frames_processed += 1
-            last_annotated_frame = annotated
-            for d in dets:
-                _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
-                job_detections.append(d)
-                
-        if last_annotated_frame is not None:
-            writer.write(last_annotated_frame)
-            
-        frame_idx += 1
-        video_jobs[job_id]["progress"] = min(
-            round(frame_idx / total_frames * 100, 1), 100.0
-        )
-
-    cap.release()
-    writer.release()
 
     try:
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                raw_output_path,
-                "-c:v",
-                "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                output_path,
-            ],
+        logger.info("[video:%s] Opening input video: %s", job_id, input_path)
+        cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Failed to open input: %s", job_id, input_path)
+            return
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        logger.info(
+            "[video:%s] Input opened frames=%s fps=%.3f size=%sx%s",
+            job_id,
+            total_frames,
+            fps,
+            w,
+            h,
+        )
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(raw_output_path, fourcc, fps, (w, h))
+        if not writer.isOpened():
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Failed to create VideoWriter: %s", job_id, raw_output_path)
+            return
+        logger.info("[video:%s] VideoWriter created: %s", job_id, raw_output_path)
+
+        process_every_n_frames = max(1, round(fps / 10))
+        last_annotated_frame = None
+
+        global frames_processed
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            if frame_idx % process_every_n_frames == 0:
+                t0 = time.time()
+                annotated, dets = detector.detect_frame(frame)
+                elapsed_ms = (time.time() - t0) * 1000.0
+                recent_inference_times.append(elapsed_ms)
+                frames_processed += 1
+                last_annotated_frame = annotated
+                for d in dets:
+                    _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
+                    job_detections.append(d)
+
+            if last_annotated_frame is not None:
+                writer.write(last_annotated_frame)
+
+            frame_idx += 1
+            progress = min(round(frame_idx / total_frames * 100, 1), 100.0)
+            video_jobs[job_id]["progress"] = max(video_jobs[job_id]["progress"], progress)
+
+            if frame_idx == 1 or frame_idx % 30 == 0 or frame_idx == total_frames:
+                elapsed = max(time.time() - process_started_at, 1e-6)
+                logger.info(
+                    "[video:%s] frame=%s/%s progress=%.1f speed=%.2f fps",
+                    job_id,
+                    frame_idx,
+                    total_frames,
+                    video_jobs[job_id]["progress"],
+                    frame_idx / elapsed,
+                )
+
+        logger.info("[video:%s] Frame processing complete processed_frames=%s", job_id, frame_idx)
+
+        if cap is not None:
+            cap.release()
+            cap = None
+        if writer is not None:
+            writer.release()
+            writer = None
+        logger.info("[video:%s] Released VideoCapture and VideoWriter", job_id)
+
+        if not os.path.exists(raw_output_path):
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Raw output missing: %s", job_id, raw_output_path)
+            return
+
+        raw_size = os.path.getsize(raw_output_path)
+        logger.info("[video:%s] Raw output ready path=%s size=%s", job_id, raw_output_path, raw_size)
+        if raw_size <= 0:
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Raw output is empty: %s", job_id, raw_output_path)
+            return
+
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            raw_output_path,
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            output_path,
+        ]
+        logger.info("[video:%s] Running FFmpeg: %s", job_id, " ".join(ffmpeg_cmd))
+        ffmpeg_result = subprocess.run(
+            ffmpeg_cmd,
             check=True,
             capture_output=True,
+            text=True,
         )
+        logger.info("[video:%s] FFmpeg stdout: %s", job_id, (ffmpeg_result.stdout or "").strip() or "<empty>")
+        logger.info("[video:%s] FFmpeg stderr: %s", job_id, (ffmpeg_result.stderr or "").strip() or "<empty>")
+
+        if not os.path.exists(output_path):
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Converted output missing: %s", job_id, output_path)
+            return
+
+        output_size = os.path.getsize(output_path)
+        logger.info("[video:%s] Final output created path=%s size=%s", job_id, output_path, output_size)
+        if output_size <= 0:
+            video_jobs[job_id]["status"] = "error"
+            logger.error("[video:%s] Converted output is empty: %s", job_id, output_path)
+            return
 
         if os.path.exists(raw_output_path):
             os.remove(raw_output_path)
+            logger.info("[video:%s] Removed raw output: %s", job_id, raw_output_path)
 
     except FileNotFoundError:
         video_jobs[job_id]["status"] = "error"
-        print("FFmpeg not found. Install FFmpeg and add it to PATH.")
+        logger.exception("[video:%s] FFmpeg not found", job_id)
         return
     
     except subprocess.CalledProcessError as e:
         video_jobs[job_id]["status"] = "error"
-        print("FFmpeg conversion failed:", e.stderr.decode(errors="ignore"))
+        logger.error(
+            "[video:%s] FFmpeg conversion failed stdout=%s stderr=%s",
+            job_id,
+            (e.stdout or b"").decode(errors="ignore") if isinstance(e.stdout, bytes) else (e.stdout or "<empty>"),
+            (e.stderr or b"").decode(errors="ignore") if isinstance(e.stderr, bytes) else (e.stderr or "<empty>"),
+        )
         return
+
+    except Exception:
+        current_progress = video_jobs.get(job_id, {}).get("progress", 0.0)
+        elapsed = max(time.time() - process_started_at, 1e-6)
+        logger.exception(
+            "[video:%s] Processing failed frame=%s/%s progress=%.1f speed=%.2f fps",
+            job_id,
+            frame_idx,
+            total_frames,
+            current_progress,
+            frame_idx / elapsed,
+        )
+        video_jobs[job_id]["status"] = "error"
+        return
+
+    finally:
+        if cap is not None:
+            cap.release()
+        if writer is not None:
+            writer.release()
 
     video_jobs[job_id].update(
         {

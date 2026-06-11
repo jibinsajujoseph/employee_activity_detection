@@ -348,6 +348,8 @@
       border-radius: var(--radius);
       border: 1px solid var(--border);
       background: #000;
+      max-width: 100%;
+      height: auto;
     }
     .fps-counter {
       position: absolute;
@@ -766,14 +768,14 @@
         Stop Camera
       </button>
       <select class="search-input" id="quality-selector" style="width:auto; margin-left: 8px;">
-        <option value="high">High (640×480)</option>
-        <option value="medium" selected>Medium (480×360)</option>
+        <option value="high" selected>High (640×480)</option>
+        <option value="medium">Medium (480×360)</option>
         <option value="low">Low (320×240)</option>
       </select>
     </div>
 
     <div class="live-container">
-      <canvas id="live-canvas" class="live-canvas" width="480" height="360"></canvas>
+      <canvas id="live-canvas" class="live-canvas" width="640" height="480"></canvas>
       <div class="fps-counter" id="fps-counter">0 FPS</div>
       <div class="fps-counter" id="perf-badge" style="right: 80px; background: rgba(0,0,0,0.5); color: var(--text-muted);">Avg Inference: -- ms</div>
     </div>
@@ -928,6 +930,8 @@
   let mediaStream = null;
   let captureInterval = null;
   let wsRetries = 0;
+  let intentionalStop = false;
+  let reconnectTimeout = null;
   const MAX_WS_RETRIES = 3;
   let doughnutChart = null;
   let lastAlertCount = 0;
@@ -1181,7 +1185,7 @@
     medium: { width: 480, height: 360, quality: 0.6 },
     low: { width: 320, height: 240, quality: 0.5 }
   };
-  let currentQuality = QUALITY_SETTINGS.medium;
+  let currentQuality = QUALITY_SETTINGS.high;
 
   // Build activity chips
   const chipsContainer = document.getElementById("activity-chips");
@@ -1194,15 +1198,15 @@
   });
 
   btnStart.addEventListener("click", startCamera);
-  btnStop.addEventListener("click", stopCamera);
+  btnStop.addEventListener("click", () => stopCamera({ intentional: true }));
   qualitySelector.addEventListener("change", async () => {
     if (mediaStream) {
-      await startCamera();
+      await startCamera({ recreateSocket: true });
     }
   });
 
-  async function startCamera() {
-    if (mediaStream) stopCamera();
+  async function startCamera({ recreateSocket = false } = {}) {
+    if (mediaStream) stopCamera({ intentional: true, preserveCanvas: recreateSocket });
     try {
       currentQuality = QUALITY_SETTINGS[qualitySelector.value];
       liveCanvas.width = currentQuality.width;
@@ -1219,6 +1223,7 @@
       btnStart.disabled = true;
       btnStop.disabled = false;
       wsRetries = 0;
+      intentionalStop = false;
       connectLiveWs();
     } catch (e) {
       showToast("Camera access denied: " + e.message, "error");
@@ -1226,6 +1231,10 @@
   }
 
   function connectLiveWs() {
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
     const protocol = location.protocol === "https:" ? "wss" : "ws";
     liveWs = new WebSocket(`${protocol}://${location.host}/video-stream`);
 
@@ -1266,12 +1275,18 @@
       ).join("");
     };
 
-    liveWs.onclose = () => {
+    liveWs.onclose = event => {
+      if (event.target) {
+        event.target.intentionalClose = event.target.intentionalClose === true;
+      }
+      if (intentionalStop || event.target?.intentionalClose) {
+        return;
+      }
       if (mediaStream && wsRetries < MAX_WS_RETRIES) {
         wsRetries++;
         const delay = Math.pow(2, wsRetries) * 500;
         showToast(`WebSocket disconnected — retrying in ${delay/1000}s…`, "info");
-        setTimeout(connectLiveWs, delay);
+        reconnectTimeout = setTimeout(connectLiveWs, delay);
       }
     };
 
@@ -1289,14 +1304,26 @@
     }, 120); // ~8 FPS
   }
 
-  function stopCamera() {
+  function stopCamera({ intentional = true, preserveCanvas = false } = {}) {
+    intentionalStop = intentional;
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
     if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
-    if (liveWs) { wsRetries = MAX_WS_RETRIES; liveWs.close(); liveWs = null; }
+    if (liveWs) {
+      liveWs.intentionalClose = intentional;
+      if (intentional) wsRetries = MAX_WS_RETRIES;
+      liveWs.close();
+      liveWs = null;
+    }
     if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
     hiddenVideo.srcObject = null;
-    liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
-    liveCtx.fillStyle = "#000";
-    liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
+    if (!preserveCanvas) {
+      liveCtx.clearRect(0, 0, liveCanvas.width, liveCanvas.height);
+      liveCtx.fillStyle = "#000";
+      liveCtx.fillRect(0, 0, liveCanvas.width, liveCanvas.height);
+    }
     document.getElementById("fps-counter").textContent = "0 FPS";
     btnStart.disabled = false;
     btnStop.disabled = true;

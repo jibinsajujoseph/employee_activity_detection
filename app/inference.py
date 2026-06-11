@@ -263,12 +263,18 @@ class ActivityDetector:
                 conf, idx = probs.max(0)
                 conf_val = round(conf.item(), 3)
                 label = self.idx_to_class[idx.item()]
-                self._activity_cache[track_id] = {"label": label, "confidence": conf_val}
+                class_idx = idx.item()
+                self._activity_cache[track_id] = {
+                    "label": label,
+                    "confidence": conf_val,
+                    "class_idx": class_idx,
+                }
             else:
                 self._cache_hits += 1
                 cached = self._activity_cache[track_id]
                 label = cached["label"]
                 conf_val = cached["confidence"]
+                class_idx = cached["class_idx"]
 
             detections.append(
                 {
@@ -285,7 +291,7 @@ class ActivityDetector:
             )
 
             # ── draw on annotated frame ─────────────────────────────
-            class_idx = idx.item() % len(BOX_COLOURS)
+            class_idx = class_idx % len(BOX_COLOURS)
             colour = BOX_COLOURS[class_idx]
             
             is_identified = tdata["employee_id"] != "unknown"
@@ -337,6 +343,11 @@ class ActivityDetector:
 
 # ── module-level singleton (lazy) ────────────────────────────────────────
 _detector: Optional[ActivityDetector] = None
+
+
+def create_detector(device: Optional[str] = None) -> ActivityDetector:
+    """Create a fresh ActivityDetector instance with isolated mutable state."""
+    return ActivityDetector(device=device)
 
 
 def get_detector() -> ActivityDetector:
