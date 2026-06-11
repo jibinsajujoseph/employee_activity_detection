@@ -11,10 +11,13 @@ The system combines YOLOv8n for person detection and EfficientNet-B0 for activit
 - Two-stage AI inference pipeline
 - YOLOv8n person detection
 - EfficientNet-B0 activity classification
-- Multi-person activity recognition
+- Employee face recognition using InsightFace
+- Multi-person activity recognition and tracking
 - Real-time webcam inference via WebSockets
 - Video upload and background processing
-- Activity logging and alerting
+- Activity logging and productivity monitoring
+- Configurable alert system
+- Interactive analytics dashboard
 - FastAPI backend with browser-based UI
 
 ---
@@ -22,6 +25,34 @@ The system combines YOLOv8n for person detection and EfficientNet-B0 for activit
 ## Overview
 
 This project demonstrates an end-to-end AI inference pipeline for human activity recognition in workplace environments.
+
+### Extended Monitoring Pipeline
+
+In addition to activity classification, the system performs employee identification, subject tracking, productivity monitoring, and real-time alert generation.
+
+```text
+Input Frame
+    │
+    ▼
+YOLOv8n Person Detection
+    │
+    ▼
+Lightweight Subject Tracking
+    │
+    ├──────────────► Face Recognition (InsightFace)
+    │
+    ▼
+Person Cropping
+    │
+    ▼
+EfficientNet-B0 Activity Classification
+    │
+    ▼
+Productivity Analysis + Alert Engine
+    │
+    ▼
+Dashboard Metrics + Activity Logs + Alerts
+```
 
 ### Inference Pipeline
 
@@ -91,18 +122,32 @@ The model predicts the following employee activities:
 - Live bounding boxes and activity labels
 - FPS reporting
 
-### Activity Monitoring
+### Employee Recognition
+
+- Employee enrollment using facial embeddings
+- Face identification with InsightFace
+- Known and unknown person detection
+- Persistent employee embedding storage
+- Employee management APIs
+
+### Activity Monitoring and Productivity Analytics
 
 - Detection history logging
+- Productivity classification based on activity labels
+- Employee activity timelines
+- Real-time dashboard statistics
+- Activity distribution analytics
 - Confidence score tracking
-- Activity statistics and summaries
 - CSV export functionality
 
 ### Alert System
 
-- Activity-specific alert configuration
-- Confidence threshold settings
-- Triggered alert tracking
+- Inactivity detection alerts
+- Nap detection alerts
+- Unknown person alerts
+- Employee missing alerts
+- Configurable thresholds and cooldowns
+- Alert acknowledgement and resolution tracking
 
 ---
 
@@ -121,6 +166,7 @@ The model predicts the following employee activities:
 - EfficientNet-B0
 - PyTorch
 - TIMM
+- InsightFace
 
 ### Frontend
 
@@ -139,9 +185,11 @@ employee_activity_detection/
 │   ├── __init__.py
 │   ├── main.py
 │   ├── inference.py
+│   ├── face_recognition.py
 │   ├── models/
 │   │   ├── class_map.json
-│   │   └── efficientnet_b0_employee_activity.pth
+│   │   ├── efficientnet_b0_employee_activity.pth
+│   │   └── employee_embeddings.json
 │   ├── outputs/
 │   │   └── .gitkeep
 │   ├── static/
@@ -241,10 +289,11 @@ Ensure the following files are available:
 ```text
 app/models/
 ├── efficientnet_b0_employee_activity.pth
-└── class_map.json
+├── class_map.json
+└── employee_embeddings.json
 ```
 
-The application will still start without the trained weights, but predictions will be random.
+The employee embeddings file is created automatically if it does not already exist.
 
 ### 5. Run the Application
 
@@ -273,6 +322,11 @@ http://127.0.0.1:8000
 | POST   | /alerts/config         | Configure alert thresholds    |
 | GET    | /alerts                | Retrieve recent alerts        |
 | GET    | /health                | Application health status     |
+| POST   | /employees/enroll      | Enroll a new employee         |
+| GET    | /employees             | List enrolled employees       |
+| DELETE | /employees/{id}        | Delete an employee            |
+| GET    | /dashboard             | Dashboard analytics data      |
+| GET    | /alerts/config         | Retrieve alert configuration  |
 
 ---
 
@@ -290,17 +344,18 @@ http://127.0.0.1:8000
 
 ## Future Improvements
 
-- Model quantization and optimization
-- Object tracking across frames
-- Persistent database storage
-- User authentication
-- Docker deployment
-- GPU acceleration enhancements
-- Cloud-based inference deployment
-- Analytics dashboard and reporting
+- Advanced multi-object tracking (ByteTrack/DeepSORT)
+- Database-backed employee management
+- Role-based authentication and authorization
+- Docker and Kubernetes deployment
+- GPU-optimized inference pipeline
+- Distributed video processing
+- Advanced reporting and analytics
+- Cloud deployment and monitoring
+- Mobile dashboard support
 
 ---
 
 ## License
 
-This project was developed as an AI Engineering portfolio project demonstrating real-time computer vision, deep learning inference pipelines, and FastAPI-based deployment.
+This project was developed as an AI Engineering portfolio project demonstrating real-time computer vision, employee activity monitoring, face recognition, alerting systems, analytics dashboards, and FastAPI-based deployment.
