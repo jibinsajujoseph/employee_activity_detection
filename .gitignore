@@ -136,13 +136,13 @@ data/interim/
 *.temp
 
 # ============================================================
-# Keep trained model in Git
+# Trained model in Git
 # ============================================================
 
-# Your trained model should remain tracked:
+# Trained model:
 # app/models/efficientnet_b0_employee_activity.pth
 
-# Keep class mappings:
+# Class mappings:
 # app/models/class_map.json
 
 # Face recognition data
@@ -150,3 +150,5 @@ app/models/employee_embeddings.json
 app/models/employee_photos/*
 
 !app/models/employee_photos/.gitkeep
+
+notebooks/

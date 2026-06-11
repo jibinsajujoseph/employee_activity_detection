@@ -1,9 +1,7 @@
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import cv2
 import numpy as np
 import insightface
 import torch
