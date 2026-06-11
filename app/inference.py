@@ -46,6 +46,11 @@ BOX_COLOURS: List[Tuple[int, int, int]] = [
 ]
 
 
+# ── optimisation constants ───────────────────────────────────────────────────
+ACTIVITY_RECLASSIFY_EVERY = 5
+FACE_RECHECK_UNIDENTIFIED = 10
+FACE_RECHECK_IDENTIFIED = 100
+
 def _build_classifier_head(num_classes: int) -> nn.Sequential:
     """Custom classification head matching the training architecture."""
     return nn.Sequential(
@@ -67,7 +72,12 @@ class ActivityDetector:
     def __init__(self, device: Optional[str] = None):
         # ── device selection ──────────────────────────────────────────
         if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            elif torch.backends.mps.is_available():
+                self.device = torch.device("mps")
+            else:
+                self.device = torch.device("cpu")
         else:
             self.device = torch.device(device)
         print(f"[ActivityDetector] Using device: {self.device}")
@@ -75,6 +85,11 @@ class ActivityDetector:
         # ── face cache ───────────────────────────────────────────────
         self._face_cache = {}
         self._next_track_id = 0
+
+        # ── activity cache & stats ───────────────────────────────────
+        self._activity_cache = {}
+        self._cache_hits = 0
+        self._total_activity_requests = 0
 
         # ── load class map ────────────────────────────────────────────
         with open(CLASS_MAP_PATH, "r") as f:
@@ -140,6 +155,7 @@ class ActivityDetector:
     def reset_cache(self):
         """Reset the face tracking cache (e.g. between videos)."""
         self._face_cache = {}
+        self._activity_cache = {}
         self._next_track_id = 0
 
     def _compute_iou(self, box1: Tuple[int, int, int, int], box2: Tuple[int, int, int, int]) -> float:
@@ -155,7 +171,7 @@ class ActivityDetector:
         return interArea / float(box1Area + box2Area - interArea)
 
     # ── per-frame pipeline ────────────────────────────────────────────
-    @torch.no_grad()
+    @torch.inference_mode()
     def detect_frame(
         self, frame_bgr: np.ndarray, pad: int = 20, recognize_faces: bool = True
     ) -> Tuple[np.ndarray, List[Dict]]:
@@ -204,7 +220,8 @@ class ActivityDetector:
                     "employee_id": "unknown",
                     "employee_name": "Unknown",
                     "similarity": 0.0,
-                    "frame_count": 0
+                    "frame_count": 0,
+                    "locked": False
                 }
             
             tdata["bbox"] = (x1, y1, x2, y2)
@@ -222,22 +239,36 @@ class ActivityDetector:
                 continue
 
             # ── Face Recognition ──────────────────────────────────────────
-            if recognize_faces and (tdata["frame_count"] == 1 or tdata["frame_count"] % 10 == 0):
-                fr = get_face_recognizer()
-                res = fr.identify(crop)
-                tdata["employee_id"] = res["employee_id"]
-                tdata["employee_name"] = res["name"]
-                tdata["similarity"] = res["similarity"]
+            if recognize_faces and not tdata.get("locked", False):
+                fc = tdata["frame_count"]
+                is_known = tdata["employee_id"] != "unknown"
+                interval = FACE_RECHECK_IDENTIFIED if is_known else FACE_RECHECK_UNIDENTIFIED
+                if fc == 1 or fc % interval == 0:
+                    fr = get_face_recognizer()
+                    res = fr.identify(crop)
+                    tdata["employee_id"] = res["employee_id"]
+                    tdata["employee_name"] = res["name"]
+                    tdata["similarity"] = res["similarity"]
+                    if tdata["employee_id"] != "unknown" and tdata["similarity"] >= 0.75:
+                        tdata["locked"] = True
             
             new_face_cache[track_id] = tdata
 
             # Stage 2 — classify activity
-            tensor = self._preprocess_crop(crop)
-            logits = self.efficientnet(tensor)
-            probs = torch.softmax(logits, dim=1)[0]
-            conf, idx = probs.max(0)
-            conf_val = round(conf.item(), 3)
-            label = self.idx_to_class[idx.item()]
+            self._total_activity_requests += 1
+            if track_id not in self._activity_cache or tdata["frame_count"] == 1 or tdata["frame_count"] % ACTIVITY_RECLASSIFY_EVERY == 0:
+                tensor = self._preprocess_crop(crop)
+                logits = self.efficientnet(tensor)
+                probs = torch.softmax(logits, dim=1)[0]
+                conf, idx = probs.max(0)
+                conf_val = round(conf.item(), 3)
+                label = self.idx_to_class[idx.item()]
+                self._activity_cache[track_id] = {"label": label, "confidence": conf_val}
+            else:
+                self._cache_hits += 1
+                cached = self._activity_cache[track_id]
+                label = cached["label"]
+                conf_val = cached["confidence"]
 
             detections.append(
                 {

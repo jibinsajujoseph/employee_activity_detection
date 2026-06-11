@@ -4,6 +4,7 @@ All routes: upload, video processing, live WebSocket, activity log, alerts, expo
 """
 
 import base64
+import collections
 import csv
 import io
 import os
@@ -51,6 +52,10 @@ alert_configs: List[Dict] = []                      # [{label, threshold}]
 triggered_alerts: List[Dict] = []                   # recent alerts
 video_jobs: Dict[str, Dict] = {}                    # job_id → {progress, output_path, status, detections}
 MAX_LOG = 5000
+
+# ── performance stats ───────────────────────────────────────────────────
+recent_inference_times = collections.deque(maxlen=100)
+frames_processed = 0
 
 # ── app ──────────────────────────────────────────────────────────────────
 app = FastAPI(title="ActivityWatch — Employee Activity Detection")
@@ -114,17 +119,32 @@ def _process_video(job_id: str, input_path: str):
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(raw_output_path, fourcc, fps, (w, h))
 
+    process_every_n_frames = max(1, round(fps / 10))
+    last_annotated_frame = None
+
     frame_idx = 0
     job_detections: List[Dict] = []
+    
+    global frames_processed
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        annotated, dets = detector.detect_frame(frame)
-        writer.write(annotated)
-        for d in dets:
-            _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
-            job_detections.append(d)
+            
+        if frame_idx % process_every_n_frames == 0:
+            t0 = time.time()
+            annotated, dets = detector.detect_frame(frame)
+            elapsed_ms = (time.time() - t0) * 1000.0
+            recent_inference_times.append(elapsed_ms)
+            frames_processed += 1
+            last_annotated_frame = annotated
+            for d in dets:
+                _append_log("Video", d["label"], d["confidence"], d.get("employee_id", "unknown"), d.get("employee_name", "Unknown"))
+                job_detections.append(d)
+                
+        if last_annotated_frame is not None:
+            writer.write(last_annotated_frame)
+            
         frame_idx += 1
         video_jobs[job_id]["progress"] = min(
             round(frame_idx / total_frames * 100, 1), 100.0
@@ -252,10 +272,20 @@ async def video_result(job_id: str):
 async def video_stream(websocket: WebSocket):
     await websocket.accept()
     detector = get_detector()
+    
+    last_processed_time = 0.0
+    last_result = None
+    MIN_FRAME_INTERVAL = 0.08
+    global frames_processed
+    
     try:
         while True:
             data = await websocket.receive_text()
             t0 = time.time()
+            
+            if t0 - last_processed_time < MIN_FRAME_INTERVAL and last_result is not None:
+                await websocket.send_json(last_result)
+                continue
 
             # decode base64 JPEG
             try:
@@ -270,7 +300,11 @@ async def video_stream(websocket: WebSocket):
                 await websocket.send_json({"error": "Could not decode frame"})
                 continue
 
+            inf_start = time.time()
             annotated, dets = detector.detect_frame(frame)
+            elapsed_ms = (time.time() - inf_start) * 1000.0
+            recent_inference_times.append(elapsed_ms)
+            frames_processed += 1
 
             # log detections
             for d in dets:
@@ -281,15 +315,16 @@ async def video_stream(websocket: WebSocket):
             b64_frame = base64.b64encode(buf.tobytes()).decode("utf-8")
 
             elapsed = time.time() - t0
-            fps = round(1.0 / elapsed, 1) if elapsed > 0 else 0
+            fps_val = round(1.0 / elapsed, 1) if elapsed > 0 else 0
 
-            await websocket.send_json(
-                {
-                    "boxes": dets,
-                    "annotated_frame": b64_frame,
-                    "fps": fps,
-                }
-            )
+            last_result = {
+                "boxes": dets,
+                "annotated_frame": b64_frame,
+                "fps": fps_val,
+            }
+            last_processed_time = time.time()
+
+            await websocket.send_json(last_result)
     except WebSocketDisconnect:
         pass
 
@@ -424,6 +459,24 @@ async def preview_employee(employee_id: str):
 @app.get("/health")
 async def health():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+# ── Performance Stats ────────────────────────────────────────────────────
+@app.get("/perf-stats")
+async def get_perf_stats():
+    detector = get_detector()
+    avg_inference = sum(recent_inference_times) / len(recent_inference_times) if recent_inference_times else 0.0
+    avg_fps = 1000.0 / avg_inference if avg_inference > 0 else 0.0
+    
+    reqs = detector._total_activity_requests
+    hits = detector._cache_hits
+    hit_rate = hits / reqs if reqs > 0 else 0.0
+    
+    return {
+        "avg_inference_ms": round(avg_inference, 1),
+        "avg_fps": round(avg_fps, 1),
+        "frames_processed": frames_processed,
+        "cache_hit_rate": round(hit_rate, 3)
+    }
 
 
 # ── Serve frontend ───────────────────────────────────────────────────────

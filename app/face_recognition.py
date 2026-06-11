@@ -17,7 +17,11 @@ class FaceRecognizer:
         self.app = insightface.app.FaceAnalysis(name="buffalo_l")
         
         # Prepare the context based on CUDA availability
-        ctx_id = 0 if torch.cuda.is_available() else -1
+        if torch.cuda.is_available():
+            ctx_id = 0
+        else:
+            ctx_id = -1
+            print("[FaceRecognizer] Running on CPU via ONNX Runtime (MPS not supported)")
         self.app.prepare(ctx_id=ctx_id, det_size=(640, 640))
         
         self.employee_data: Dict[str, dict] = {}
