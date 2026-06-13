@@ -1,34 +1,31 @@
-# Employee Activity Detection using YOLOv8n and EfficientNet-B0
+# Employee Activity Detection
 
-A real-time computer vision application that detects employees in video streams and classifies their activities using a two-stage deep learning pipeline.
+A FastAPI-based computer vision application that combines person detection, activity recognition, face recognition, and workplace monitoring features.
 
-The system combines YOLOv8n for person detection and EfficientNet-B0 for activity recognition, supporting both uploaded video analysis and live webcam inference through a FastAPI backend and browser-based interface.
+The system supports both uploaded video analysis and live webcam inference using a two-stage deep learning pipeline built with YOLOv8n and EfficientNet-B0. In addition to activity recognition, it provides employee identification, productivity analytics, activity logging, and configurable alerting through a browser-based interface.
 
 ---
 
 ## Key Highlights
 
-- Two-stage AI inference pipeline
-- YOLOv8n person detection
-- EfficientNet-B0 activity classification
-- Employee face recognition using InsightFace
-- Multi-person activity recognition and tracking
+- YOLOv8n-based person detection
+- EfficientNet-B0 activity recognition
+- InsightFace-powered employee identification
 - Real-time webcam inference via WebSockets
-- Video upload and background processing
-- Activity logging and productivity monitoring
-- Configurable alert system
-- Interactive analytics dashboard
-- FastAPI backend with browser-based UI
+- Uploaded video processing with annotated outputs
+- IoU-based subject tracking across frames
+- Employee enrollment and face embedding management
+- Productivity analytics and activity monitoring
+- Configurable alerting system
+- REST API and browser-based dashboard
 
 ---
 
-## Overview
+## System Overview
 
-This project demonstrates an end-to-end AI inference pipeline for human activity recognition in workplace environments.
+The application processes video streams using a two-stage inference pipeline.
 
-### Extended Monitoring Pipeline
-
-In addition to activity classification, the system performs employee identification, subject tracking, productivity monitoring, and real-time alert generation.
+### Monitoring Pipeline
 
 ```text
 Input Frame
@@ -37,9 +34,9 @@ Input Frame
 YOLOv8n Person Detection
     │
     ▼
-Lightweight Subject Tracking
+IoU-Based Subject Tracking
     │
-    ├──────────────► Face Recognition (InsightFace)
+    ├──────────────► InsightFace Recognition
     │
     ▼
 Person Cropping
@@ -48,13 +45,14 @@ Person Cropping
 EfficientNet-B0 Activity Classification
     │
     ▼
-Productivity Analysis + Alert Engine
-    │
+Activity Logging
     ▼
-Dashboard Metrics + Activity Logs + Alerts
+Productivity Analytics
+    ▼
+Alert Generation & Dashboard Updates
 ```
 
-### Inference Pipeline
+### Inference Flow
 
 ```text
 Input Frame
@@ -69,22 +67,21 @@ Person Cropping
 EfficientNet-B0 Activity Classification
     │
     ▼
-Annotated Output + Activity Logs
+Annotated Output + Detection Data
 ```
 
-For each frame:
+For each processed frame:
 
-1. YOLOv8n detects all people present in the scene.
-2. Each detected person is cropped from the frame.
-3. EfficientNet-B0 classifies the activity being performed.
-4. Bounding boxes, labels, and confidence scores are rendered on the output frame.
-5. Results are logged and made available through the API.
+1. YOLOv8n detects people in the scene.
+2. Subjects are tracked across frames using bounding-box IoU matching.
+3. Face recognition is performed when enabled.
+4. Person crops are classified by EfficientNet-B0.
+5. Detection results are logged and analysed.
+6. Dashboard metrics and alerts are updated.
 
 ---
 
 ## Activity Classes
-
-The model predicts the following employee activities:
 
 | Class | Activity                  |
 | ----- | ------------------------- |
@@ -108,71 +105,92 @@ The model predicts the following employee activities:
 
 ## Features
 
-### Video Upload Processing
+### Video Processing
 
 - Upload MP4, AVI, or MOV videos
-- Background processing using FastAPI tasks
+- Background video processing using FastAPI tasks
 - Annotated output video generation
-- Progress tracking through API endpoints
+- Processing progress tracking
+- Detection summaries for completed jobs
 
 ### Live Webcam Inference
 
-- Real-time frame processing via WebSocket
-- Multi-person detection support
-- Live bounding boxes and activity labels
+- Real-time frame processing through WebSockets
+- Multi-person detection and activity recognition
+- Annotated video stream
+- Live alert updates
 - FPS reporting
 
 ### Employee Recognition
 
-- Employee enrollment using facial embeddings
-- Face identification with InsightFace
+- Employee enrollment from uploaded images
+- Multiple face embeddings per employee
+- InsightFace-based identification
 - Known and unknown person detection
-- Persistent employee embedding storage
+- Employee photo validation
+- Employee preview image support
 - Employee management APIs
 
-### Activity Monitoring and Productivity Analytics
+### Activity Monitoring & Analytics
 
 - Detection history logging
-- Productivity classification based on activity labels
-- Employee activity timelines
-- Real-time dashboard statistics
+- Activity event tracking
+- Productivity scoring
+- Employee productivity breakdown
 - Activity distribution analytics
-- Confidence score tracking
-- CSV export functionality
+- Active employee tracking
+- Dashboard summary metrics
 
-### Alert System
+### Alerting
 
-- Inactivity detection alerts
-- Nap detection alerts
-- Unknown person alerts
-- Employee missing alerts
-- Configurable thresholds and cooldowns
-- Alert acknowledgement and resolution tracking
+Supported alert types:
+
+- Employee inactivity
+- Nap detection
+- Unknown person detection
+
+Features:
+
+- Configurable thresholds
+- Alert cooldown handling
+- Active and historical alert tracking
+- Severity levels
+- Event log generation
+
+### Performance Monitoring
+
+- Inference timing statistics
+- FPS metrics
+- Activity-classification cache statistics
+- Processed-frame tracking
 
 ---
 
 ## Technology Stack
 
+### Computer Vision
+
+- YOLOv8n
+- EfficientNet-B0
+- InsightFace
+- OpenCV
+
 ### Backend
 
 - FastAPI
 - Uvicorn
-- OpenCV
 - WebSockets
 
 ### Deep Learning
 
-- YOLOv8n
-- EfficientNet-B0
 - PyTorch
 - TIMM
-- InsightFace
+- ONNX Runtime
 
 ### Frontend
 
 - HTML
 - JavaScript
-- WebSocket API
 
 ---
 
@@ -180,26 +198,20 @@ The model predicts the following employee activities:
 
 ```text
 employee_activity_detection/
-├── .venv/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py
 │   ├── inference.py
 │   ├── face_recognition.py
 │   ├── models/
 │   │   ├── class_map.json
 │   │   ├── efficientnet_b0_employee_activity.pth
-│   │   └── employee_embeddings.json
+│   │   ├── employee_embeddings.json
+│   │   └── employee_photos/
 │   ├── outputs/
-│   │   └── .gitkeep
-│   ├── static/
-│   │   └── index.html
-│   └── uploads/
-│       └── .gitkeep
-├── .gitignore
+│   ├── uploads/
+│   └── static/
 ├── README.md
-├── requirements.txt
-
+└── requirements.txt
 ```
 
 ---
@@ -210,98 +222,62 @@ employee_activity_detection/
 
 - Python 3.10 or higher
 
-Verify:
-
 ```bash
 python --version
 ```
 
 ### FFmpeg
 
-This project uses FFmpeg to convert annotated videos into a browser-compatible MP4 format (H.264).
-
-Verify installation:
+Used for converting generated videos into browser-compatible MP4 format.
 
 ```bash
 ffmpeg -version
-```
-
-#### Windows
-
-Install using Winget:
-
-```powershell
-winget install ffmpeg
-```
-
-Or download from:
-https://ffmpeg.org/download.html
-
-#### macOS
-
-Using Homebrew:
-
-```bash
-brew install ffmpeg
 ```
 
 ---
 
 ## Setup
 
-### 1. Clone the Repository
+### Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/jibinsajujoseph/employee_activity_detection
 cd employee_activity_detection
 ```
 
-### 2. Create a Virtual Environment
+### Create a Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate the environment:
+### Activate the Environment
 
-**macOS / Linux**
+macOS / Linux
 
 ```bash
 source .venv/bin/activate
 ```
 
-**Windows**
+Windows
 
 ```bash
 .venv\Scripts\activate
 ```
 
-### 3. Install Dependencies
+### Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Verify Model Files
-
-Ensure the following files are available:
-
-```text
-app/models/
-├── efficientnet_b0_employee_activity.pth
-├── class_map.json
-└── employee_embeddings.json
-```
-
-The employee embeddings file is created automatically if it does not already exist.
-
-### 5. Run the Application
+### Run the Application
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-Open your browser and navigate to:
+Open:
 
 ```text
 http://127.0.0.1:8000
@@ -311,51 +287,70 @@ http://127.0.0.1:8000
 
 ## API Endpoints
 
-| Method | Endpoint               | Description                   |
-| ------ | ---------------------- | ----------------------------- |
-| POST   | /upload                | Upload a video for processing |
-| GET    | /video-status/{job_id} | Retrieve processing progress  |
-| GET    | /video-result/{job_id} | Download annotated video      |
-| WS     | /video-stream          | Real-time webcam inference    |
-| GET    | /activity-log          | Recent detection events       |
-| GET    | /export/csv            | Export activity log as CSV    |
-| POST   | /alerts/config         | Configure alert thresholds    |
-| GET    | /alerts                | Retrieve recent alerts        |
-| GET    | /health                | Application health status     |
-| POST   | /employees/enroll      | Enroll a new employee         |
-| GET    | /employees             | List enrolled employees       |
-| DELETE | /employees/{id}        | Delete an employee            |
-| GET    | /dashboard             | Dashboard analytics data      |
-| GET    | /alerts/config         | Retrieve alert configuration  |
+### Video Processing
 
----
+| Method | Endpoint               |
+| ------ | ---------------------- |
+| POST   | /upload                |
+| GET    | /video-status/{job_id} |
+| GET    | /video-result/{job_id} |
+| WS     | /video-stream          |
 
-## Sample Workflow
+### Monitoring & Analytics
 
-1. Start the FastAPI server.
-2. Open the web interface in a browser.
-3. Upload a video or start the webcam stream.
-4. The backend detects people using YOLOv8n.
-5. EfficientNet-B0 classifies activities for each detected person.
-6. Results are displayed with labels and confidence scores.
-7. Logs and alerts are generated automatically.
+| Method | Endpoint           |
+| ------ | ------------------ |
+| GET    | /activity-log      |
+| GET    | /activity-events   |
+| GET    | /dashboard-summary |
+| GET    | /export/csv        |
+
+### Alerts
+
+| Method | Endpoint         |
+| ------ | ---------------- |
+| GET    | /alerts          |
+| GET    | /alerts/active   |
+| GET    | /alerts/settings |
+| POST   | /alerts/settings |
+| GET    | /alerts/config   |
+| POST   | /alerts/config   |
+
+### Employee Management
+
+| Method | Endpoint                         |
+| ------ | -------------------------------- |
+| POST   | /employees/enroll                |
+| POST   | /employees/enroll/batch          |
+| POST   | /employees/validate-photos       |
+| GET    | /employees                       |
+| GET    | /employees/{employee_id}         |
+| DELETE | /employees/{employee_id}         |
+| GET    | /employees/{employee_id}/preview |
+
+### System
+
+| Method | Endpoint    |
+| ------ | ----------- |
+| GET    | /health     |
+| GET    | /perf-stats |
 
 ---
 
 ## Future Improvements
 
-- Advanced multi-object tracking (ByteTrack/DeepSORT)
+- ByteTrack or DeepSORT integration
 - Database-backed employee management
-- Role-based authentication and authorization
-- Docker and Kubernetes deployment
+- Authentication and role-based access control
+- Dockerized deployment
 - GPU-optimized inference pipeline
 - Distributed video processing
-- Advanced reporting and analytics
-- Cloud deployment and monitoring
-- Mobile dashboard support
+- Cloud deployment support
+- Mobile-friendly dashboard
+- Historical reporting and trend analysis
 
 ---
 
 ## License
 
-This project was developed as an AI Engineering portfolio project demonstrating real-time computer vision, employee activity monitoring, face recognition, alerting systems, analytics dashboards, and FastAPI-based deployment.
+This project was developed as an AI engineering portfolio project demonstrating real-time computer vision, activity recognition, employee identification, monitoring workflows, analytics, and FastAPI-based deployment.
