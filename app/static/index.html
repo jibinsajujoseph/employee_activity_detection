@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="ActivityWatch — Real-time employee activity detection powered by YOLOv8 and EfficientNet-B0. Monitor, analyse, and export workplace activity data."
+      content="EyeQ — Real-time employee activity detection powered by YOLOv8 and EfficientNet-B0. Monitor, analyse, and export workplace activity data."
     />
-    <title>ActivityWatch — Employee Activity Detection</title>
+    <title>EyeQ — Employee Activity Detection</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -1160,7 +1160,7 @@
           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
           <circle cx="12" cy="12" r="3" />
         </svg>
-        <h1>ActivityWatch</h1>
+        <h1>EyeQ</h1>
       </div>
 
       <ul class="nav-links">
@@ -1804,7 +1804,8 @@
                 Business Alert Thresholds
               </h3>
               <p class="field-hint">
-                Configure alert timing in seconds to align with your operational policies.
+                Configure alert timing in seconds to align with your operational
+                policies.
               </p>
             </div>
             <button class="audio-toggle" id="audio-toggle" type="button">
@@ -1821,7 +1822,9 @@
                 step="1"
                 value="10"
               />
-              <small>Triggers when a recognized employee is not productive.</small>
+              <small
+                >Triggers when a recognized employee is not productive.</small
+              >
             </div>
             <div class="alert-config-item">
               <span class="label">Nap Threshold (Seconds)</span>
@@ -1960,7 +1963,7 @@
 
     <script>
       /* ═══════════════════════════════════════════════════════════════════
-   ActivityWatch — Frontend Logic
+   EyeQ — Frontend Logic
    ═══════════════════════════════════════════════════════════════════ */
       (() => {
         "use strict";
@@ -2207,7 +2210,9 @@
         }
 
         function renderEmployeeProductivity(items) {
-          const container = document.getElementById("employee-productivity-list");
+          const container = document.getElementById(
+            "employee-productivity-list",
+          );
           if (!items.length) {
             container.innerHTML =
               '<p style="color: var(--text-muted); font-size: 0.88rem">No employee activity yet.</p>';
@@ -2785,15 +2790,13 @@
             }
           });
 
-        [
-          "threshold-inactivity",
-          "threshold-nap",
-          "threshold-unknown",
-        ].forEach((id) => {
-          document
-            .getElementById(id)
-            .addEventListener("change", saveAlertSettings);
-        });
+        ["threshold-inactivity", "threshold-nap", "threshold-unknown"].forEach(
+          (id) => {
+            document
+              .getElementById(id)
+              .addEventListener("change", saveAlertSettings);
+          },
+        );
 
         updateAudioToggle();
 
@@ -3087,8 +3090,7 @@
           enrollPhotoDiagnostics = [];
           enrollFileInput.value = "";
           if (!preserveName) enrollNameInput.value = "";
-          enrollStatusMessage.textContent =
-            "";
+          enrollStatusMessage.textContent = "";
           document.getElementById("enroll-filename").textContent = "";
           webcamCaptureGrid.innerHTML = "";
           webcamEmptyState.style.display = "block";

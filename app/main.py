@@ -65,7 +65,7 @@ frames_processed = 0
 logger = logging.getLogger(__name__)
 
 # ── app ──────────────────────────────────────────────────────────────────
-app = FastAPI(title="ActivityWatch — Employee Activity Detection")
+app = FastAPI(title="EyeQ — Employee Activity Detection")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1133,4 +1133,4 @@ async def root():
     index = STATIC_DIR / "index.html"
     if index.exists():
         return HTMLResponse(index.read_text(encoding="utf-8"))
-    return HTMLResponse("<h1>ActivityWatch</h1><p>Frontend not found.</p>")
+    return HTMLResponse("<h1>EyeQ</h1><p>Frontend not found.</p>")
